@@ -1,0 +1,3463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>植物性状提取工具</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f5f7f5; color: #2c3e2d; font-size: 14px; }
+
+  .header { background: linear-gradient(135deg, #2d6a4f, #40916c); color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header .subtitle { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; display: inline-flex; align-items: center; gap: 5px; }
+  .btn-primary { background: #2d6a4f; color: #fff; }
+  .btn-primary:hover { background: #1b4332; }
+  .btn-primary:disabled { background: #95a595; cursor: not-allowed; }
+  .btn-secondary { background: #fff; color: #2d6a4f; border: 1px solid #2d6a4f; }
+  .btn-secondary:hover { background: #e8f5ee; }
+  .btn-danger { background: #e74c3c; color: #fff; }
+  .btn-danger:hover { background: #c0392b; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-light { background: #fff; color: #555; border: 1px solid #ccc; }
+  .btn-light:hover { background: #f0f0f0; }
+
+  .main { display: flex; align-items: flex-start; }
+  .left-panel { width: 40%; border-right: 1px solid #d0d8d0; background: #fff; }
+  .right-panel { width: 60%; background: #fff; }
+
+  .panel-section { padding: 12px 16px; border-bottom: 1px solid #e8ede8; }
+  .panel-section:last-child { border-bottom: none; }
+  .section-label { font-size: 12px; font-weight: 600; color: #2d6a4f; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; }
+  .taxon-input { width: 100%; padding: 8px 10px; border: 1px solid #c5d0c5; border-radius: 6px; font-size: 14px; }
+  .taxon-input:focus { outline: none; border-color: #40916c; box-shadow: 0 0 0 2px rgba(64,145,108,0.2); }
+  .url-row { display: flex; gap: 6px; }
+  .url-input { flex: 1; padding: 8px 10px; border: 1px solid #c5d0c5; border-radius: 6px; font-size: 13px; }
+  .url-input:focus { outline: none; border-color: #40916c; box-shadow: 0 0 0 2px rgba(64,145,108,0.2); }
+  .text-area { width: 100%; padding: 10px; border: 1px solid #c5d0c5; border-radius: 6px; font-size: 13px; font-family: inherit; line-height: 1.7; min-height: 200px; white-space: pre-wrap; word-break: break-word; background: #fff; }
+  .text-area:focus { outline: none; border-color: #40916c; box-shadow: 0 0 0 2px rgba(64,145,108,0.2); }
+  .text-area:empty::before { content: attr(data-placeholder); color: #999; white-space: pre-line; pointer-events: none; }
+  .trait-highlight { background: linear-gradient(transparent 60%, #ffd54f 60%); padding: 0 1px; border-radius: 2px; cursor: pointer; transition: background 0.2s; }
+  .trait-highlight:hover { background: linear-gradient(transparent 40%, #ffb300 40%); }
+  .trait-highlight.active { background: linear-gradient(transparent 30%, #ff8a65 30%); }
+  .action-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .hint { font-size: 11px; color: #888; margin-top: 6px; line-height: 1.5; }
+
+  .selection-bar { display: none; padding: 6px 10px; background: #fff8e1; border: 1px solid #f0d080; border-radius: 4px; font-size: 12px; color: #8a6d00; margin-top: 8px; align-items: center; gap: 8px; }
+  .selection-bar.active { display: flex; }
+  .selection-bar .sel-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
+  .selection-bar .sel-clear { cursor: pointer; color: #999; font-weight: bold; }
+  .selection-bar .sel-clear:hover { color: #333; }
+
+  .field-header { padding: 12px 16px; background: #f0f5f0; border-bottom: 1px solid #d0d8d0; display: flex; justify-content: space-between; align-items: center; }
+  .field-header h3 { font-size: 14px; color: #2d6a4f; }
+  .field-groups { padding: 12px 16px; }
+  .field-group { margin-bottom: 14px; }
+  .group-title { font-size: 13px; font-weight: 600; color: #1b4332; padding: 6px 10px; background: #e8f5ee; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #40916c; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+  .field-item { display: flex; flex-direction: column; }
+  .field-item.full { grid-column: 1 / -1; }
+  .field-label { font-size: 11px; color: #666; margin-bottom: 3px; display: flex; align-items: center; gap: 4px; cursor: default; user-select: none; }
+  .field-label.clickable { cursor: pointer; color: #2d6a4f; }
+  .field-label.clickable:hover { text-decoration: underline; }
+  .field-label .type-badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; background: #e0e0e0; color: #666; cursor: pointer; }
+  .field-label .type-badge.type-list { background: #e3f2fd; color: #1565c0; }
+  .field-label .type-badge.type-number { background: #fff3e0; color: #e65100; }
+  .field-label .type-badge.type-string { background: #f3e5f5; color: #7b1fa2; }
+  .field-label .desc-icon { font-size: 10px; color: #aaa; cursor: help; }
+  .field-input { padding: 6px 8px; border: 1px solid #c5d0c5; border-radius: 4px; font-size: 12px; width: 100%; }
+  .field-input:focus { outline: none; border-color: #40916c; box-shadow: 0 0 0 2px rgba(64,145,108,0.15); }
+  .field-input.has-value { border-color: #40916c; background: #f0faf4; }
+
+  .records-section { border-top: 2px solid #2d6a4f; background: #fff; }
+  .records-header { padding: 10px 16px; background: #f0f5f0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d0d8d0; }
+  .records-header h3 { font-size: 14px; color: #2d6a4f; }
+  .records-count { font-size: 12px; color: #888; }
+  .records-table-wrap { flex: 1; overflow: auto; }
+  .records-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .records-table th { background: #e8f5ee; color: #1b4332; padding: 8px 6px; text-align: left; position: sticky; top: 0; z-index: 1; white-space: nowrap; border-bottom: 2px solid #40916c; font-weight: 600; }
+  .records-table td { padding: 6px; border-bottom: 1px solid #eee; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .records-table tr:hover { background: #f5faf5; }
+  .records-table .row-actions { white-space: nowrap; }
+  .empty-state { text-align: center; padding: 30px; color: #aaa; font-size: 13px; }
+
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: #fff; border-radius: 10px; padding: 24px; width: 520px; max-width: 90vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+  .modal h3 { font-size: 16px; color: #2d6a4f; margin-bottom: 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 5px; }
+  .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px 10px; border: 1px solid #c5d0c5; border-radius: 6px; font-size: 13px; }
+  .form-group input:focus, .form-group textarea:focus { outline: none; border-color: #40916c; }
+  .form-group .hint { font-size: 11px; color: #999; margin-top: 4px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+  .field-config-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .field-config-table th { background: #e8f5ee; padding: 6px 8px; text-align: left; border-bottom: 2px solid #40916c; }
+  .field-config-table td { padding: 5px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+  .field-config-table select { padding: 3px 6px; border: 1px solid #c5d0c5; border-radius: 4px; font-size: 12px; }
+  .field-config-table input[type="text"] { padding: 3px 6px; border: 1px solid #c5d0c5; border-radius: 4px; font-size: 12px; width: 100%; }
+
+  .status-bar { padding: 8px 16px; font-size: 12px; display: none; }
+  .status-bar.info { display: block; background: #e8f4fd; color: #2980b9; }
+  .status-bar.success { display: block; background: #e8f8f0; color: #27ae60; }
+  .status-bar.error { display: block; background: #fdecea; color: #c0392b; }
+  .status-bar.loading { display: block; background: #fff8e1; color: #f39c12; }
+
+  .loading-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 尺寸字段折叠组 */
+  .size-group { margin-bottom: 10px; border: 1px solid #d0e0d0; border-radius: 6px; overflow: hidden; }
+  .size-group-header { padding: 6px 10px; background: #f0f7f0; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: #1b4332; user-select: none; }
+  .size-group-header:hover { background: #e8f5ee; }
+  .size-group-header .toggle { font-size: 10px; color: #888; transition: transform 0.2s; }
+  .size-group.collapsed .toggle { transform: rotate(-90deg); }
+  .size-group-content { padding: 8px 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; background: #fafdfb; }
+  .size-group.collapsed .size-group-content { display: none; }
+  .size-group .field-item { margin-bottom: 0; }
+  .size-group .field-label { font-size: 10px; }
+  .size-group .field-input { padding: 4px 6px; font-size: 11px; }
+  .size-group .avg-badge { display: inline-block; font-size: 9px; padding: 0 4px; background: #e8f5e9; color: #2e7d32; border-radius: 3px; margin-left: 4px; }
+
+  /* 批量处理队列 */
+  .batch-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .batch-current { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: #1b4332; padding: 4px 8px; background: #f0f7f0; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .batch-list { max-height: 120px; overflow-y: auto; border: 1px solid #e0e8e0; border-radius: 4px; margin-bottom: 8px; }
+  .batch-item { padding: 4px 8px; font-size: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0; }
+  .batch-item:last-child { border-bottom: none; }
+  .batch-item:hover { background: #f5faf5; }
+  .batch-item.active { background: #e8f5ee; font-weight: 600; color: #1b4332; }
+  .batch-item.done { color: #27ae60; }
+  .batch-item.done .batch-status::before { content: '✅ '; }
+  .batch-item.pending .batch-status::before { content: '⏳ '; }
+  .batch-item.active .batch-status::before { content: '📝 '; }
+  .batch-status { font-size: 11px; color: #888; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #f0f0f0; }
+  ::-webkit-scrollbar-thumb { background: #c0c8c0; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #a0a8a0; }
+
+  .welcome-box { text-align: center; padding: 40px 20px; color: #888; }
+  .welcome-box .icon { font-size: 48px; margin-bottom: 16px; }
+  .welcome-box h3 { color: #2d6a4f; margin-bottom: 10px; font-size: 16px; }
+  .welcome-box p { font-size: 13px; line-height: 1.8; margin-bottom: 8px; }
+  .welcome-box .steps { text-align: left; max-width: 400px; margin: 16px auto; background: #f8faf8; padding: 16px 20px; border-radius: 8px; border: 1px dashed #c5d0c5; }
+  .welcome-box .steps li { margin-bottom: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🌿 植物性状提取工具</h1>
+    <div class="subtitle">导入CSV定义性状 → 抓取网页/粘贴文本 → AI提取或划词填入 → 导出Excel</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary" onclick="document.getElementById('csvFileInput').click()">📥 导入CSV</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('batchFileInput').click()">📁 批量导入TXT</button>
+    <button class="btn btn-secondary" onclick="openFieldConfig()">⚙️ 字段配置</button>
+    <button class="btn btn-secondary" onclick="openMappingManager()">🔗 映射管理</button>
+    <button class="btn btn-secondary" onclick="openSettings()">⚙️ 设置</button>
+    <input type="file" id="backupFileInput" accept=".json" style="display:none" onchange="importBackup(event)">
+    <button class="btn btn-primary" onclick="exportExcel()">📊 导出Excel</button>
+  </div>
+</div>
+
+<div class="status-bar" id="statusBar"></div>
+
+<div class="main">
+  <div class="left-panel">
+    <div class="panel-section">
+      <div class="section-label">物种学名 (taxon)</div>
+      <input type="text" class="taxon-input" id="taxonInput" placeholder="例如：Elaeagnus angustifolia" oninput="updateFieldFillCount()">
+    </div>
+    <div class="panel-section" id="batchSection" style="display:none;">
+      <div class="section-label">
+        <span>📁 批量处理队列</span>
+        <span style="font-weight:normal;text-transform:none;letter-spacing:0;color:#999;font-size:11px;" id="batchProgress">0 / 0</span>
+      </div>
+      <div class="batch-controls">
+        <button class="btn btn-light btn-sm" onclick="prevSpecies()">⬅️ 上一个</button>
+        <span class="batch-current" id="batchCurrentName">未选择</span>
+        <button class="btn btn-light btn-sm" onclick="nextSpecies()">下一个 ➡️</button>
+      </div>
+      <div class="auto-extract-section" style="margin-top:8px;padding:8px;background:#f0f7f4;border-radius:4px;">
+        <div style="font-size:12px;font-weight:600;color:#1b4332;margin-bottom:6px;">🤖 自动批量提取</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+          <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+            <input type="radio" name="autoMode" value="full" checked onchange="autoExtractMode='full'"> 全自动
+          </label>
+          <label style="font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;">
+            <input type="radio" name="autoMode" value="semi" onchange="autoExtractMode='semi'"> 半自动
+          </label>
+          <span style="font-size:10px;color:#888;" id="autoModeHint">全自动：不弹映射确认，直接应用</span>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-primary btn-sm" id="autoExtractBtn" onclick="toggleAutoExtract()" style="flex:1;">▶️ 开始自动提取</button>
+        </div>
+        <div style="font-size:11px;color:#666;margin-top:6px;" id="autoExtractStatus">就绪</div>
+      </div>
+      <div class="batch-list" id="batchList"></div>
+      <div class="action-row" style="margin-top:8px;">
+        <button class="btn btn-light btn-sm" onclick="clearBatchQueue()">🗑️ 清空队列</button>
+        <button class="btn btn-light btn-sm" onclick="document.getElementById('batchFileInput').click()">➕ 追加文件</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-label">
+        <span>植物描述文本</span>
+        <span style="font-weight:normal;text-transform:none;letter-spacing:0;color:#999;font-size:11px;" id="charCount">0 字</span>
+      </div>
+      <div class="text-area" id="textInput" contenteditable="true" data-placeholder="将植物形态描述文本粘贴到这里&#10;&#10;💡 划词技巧：在文本中选中一段文字，然后点击右侧字段名，即可快速填入。&#10;💡 高亮技巧：点击右侧性状字段名，可在原文中高亮该性状的提取来源。" oninput="updateCharCount()"></div>
+      <div class="selection-bar" id="selectionBar">
+        <span>✂️ 已选中：</span>
+        <span class="sel-text" id="selectionText"></span>
+        <span class="sel-clear" onclick="clearSelection()">✕</span>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-primary" id="extractBtn" onclick="extractTraits()">🤖 AI提取性状</button>
+        <button class="btn btn-light" onclick="clearText()">清空文本</button>
+      </div>
+      <div class="hint">列表类字段多个值用英文逗号分隔。提取后可在右侧手动修改，也可直接划词填入。</div>
+    </div>
+    <div class="panel-section">
+      <div class="section-label">当前记录操作</div>
+      <div class="action-row">
+        <button class="btn btn-primary" onclick="addRecord()">✅ 添加到记录列表</button>
+        <button class="btn btn-light" onclick="clearFields()">清空字段</button>
+      </div>
+      <div class="hint">添加后字段清空，可继续提取下一个物种。所有记录可在下方表格查看、编辑和导出。</div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="field-header">
+      <h3>性状字段编辑（共<span id="fieldTotalCount">0</span>项）</h3>
+      <span id="fieldFillCount" style="font-size:12px;color:#888;">已填 0 / 0</span>
+    </div>
+    <div class="field-groups" id="fieldGroups">
+    </div>
+
+    <div class="records-section">
+      <div class="records-header">
+        <h3>📋 已提取记录</h3>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="records-count" id="recordsCount">共 0 条</span>
+          <button class="btn btn-danger btn-sm" onclick="clearAllRecords()">清空全部</button>
+        </div>
+      </div>
+      <div class="records-table-wrap">
+        <table class="records-table" id="recordsTable">
+          <thead><tr id="recordsHead"></tr></thead>
+          <tbody id="recordsBody"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState">暂无记录</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 设置模态框 -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h3>⚙️ 设置</h3>
+    
+    <h4 style="margin:16px 0 8px 0;font-size:14px;color:#555;">API 配置</h4>
+    <div class="form-group">
+      <label>API Base URL</label>
+      <input type="text" id="apiBase" placeholder="https://ark.cn-beijing.volces.com/api/v3">
+      <div class="hint">OpenAI 兼容格式的 API 地址。豆包/火山引擎用上面的默认值。</div>
+    </div>
+    <div class="form-group">
+      <label>API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-xxxxxxxxxxxxxxxx">
+      <div class="hint">仅保存在浏览器本地 (localStorage)，不会上传到任何第三方。</div>
+    </div>
+    <div class="form-group">
+      <label>模型 / Endpoint ID</label>
+      <input type="text" id="apiModel" placeholder="ep-2024xxxxxx-xxxxx 或 gpt-4o-mini">
+      <div class="hint">豆包用推理接入点 ID (ep-开头)；其他平台用模型名称。</div>
+    </div>
+
+    <h4 style="margin:20px 0 8px 0;font-size:14px;color:#555;">数据管理</h4>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="exportBackup()" title="导出所有数据（字段配置、映射缓存、API设置）">💾 备份数据</button>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('backupFileInput').click()" title="从备份文件恢复数据">📂 恢复数据</button>
+      <button class="btn btn-danger btn-sm" onclick="resetAllData()">🗑️ 重置所有数据</button>
+    </div>
+    <div class="hint" style="margin-bottom:16px;">备份文件包含字段配置、AI归类缓存、API设置和所有记录。换电脑或分享给别人时可以用备份功能迁移数据。</div>
+
+    <div class="modal-actions">
+      <button class="btn btn-light" onclick="closeSettings()">取消</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保存 API 设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- 字段配置模态框 -->
+<div class="modal-overlay" id="fieldConfigModal">
+  <div class="modal" style="width:860px;">
+    <h3>⚙️ 字段配置</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:12px;">
+      点击<strong>类型</strong>可切换：文本(S) / 列表(L) / 数值(N)。<br>
+      <strong>AI说明</strong>列填写该性状的提取提示，能提高提取准确率。<br>
+      <strong>标准示例</strong>列填写2-5个标准描述词（逗号分隔），AI提取后会自动将原始描述归类到这些标准词，并生成映射表供你检查确认。
+    </p>
+    <div id="fieldConfigContent" style="max-height:55vh;overflow-y:auto;"></div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('fieldConfigFileInput').click()">📥 导入配置CSV</button>
+        <button class="btn btn-warning btn-sm" onclick="clearMappingCache()">🗑️ 清除AI归类缓存</button>
+        <button class="btn btn-danger btn-sm" onclick="clearAllStandardExamples()">🧹 清除所有标准词</button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-light" onclick="closeFieldConfig()">关闭</button>
+        <button class="btn btn-primary" onclick="saveFieldConfig()">保存并重新渲染</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none" onchange="handleCsvImport(event)">
+<input type="file" id="mappingFileInput" accept=".csv,.txt" style="display:none" onchange="handleMappingImport(event)">
+<input type="file" id="fieldConfigFileInput" accept=".csv,.txt" style="display:none" onchange="handleFieldConfigImport(event)">
+<input type="file" id="batchFileInput" accept=".txt,.text" multiple style="display:none" onchange="handleBatchImport(event)">
+
+<!-- 映射表确认模态框 -->
+<div class="modal-overlay" id="mappingModal">
+  <div class="modal" style="width:820px;">
+    <h3>🔄 AI归类映射表 — 请检查确认</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:12px;line-height:1.6;">
+      AI 已将提取到的<strong>原始描述</strong>自动归类到你设置的<strong>标准词</strong>。下表显示「哪些原始词 → 被归类为 → 哪个标准词」，可通过下拉框修改。确认后应用标准词到字段，并缓存此映射供后续复用。
+    </p>
+    <div id="mappingContent" style="max-height:55vh;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-light" onclick="exportMappingTable()">📥 导出映射表CSV</button>
+      <button class="btn btn-light" onclick="skipMapping()">跳过（保留原始值）</button>
+      <button class="btn btn-primary" onclick="applyMapping()">✅ 确认并应用</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== 全局状态 ====================
+// 每个字段: { key, label, type, group, originalName, isTaxon, desc, standardExamples }
+let FIELD_CONFIG = [];
+let records = [];
+let editingIndex = -1;
+let currentSelection = '';
+// 映射缓存: { fieldKey: { originalValue: standardValue } }
+let MAPPING_CACHE = {};
+// 当前待确认的映射表
+let PENDING_MAPPINGS = [];
+// 批量处理队列
+let speciesQueue = []; // [{name, content, status: 'pending'|'active'|'done'}]
+let currentSpeciesIndex = -1;
+// 字段来源位置: { fieldKey: [{start, end}, ...] }
+let FIELD_SOURCES = {};
+// 当前高亮的字段key
+let activeHighlightKey = null;
+// 自动批量提取状态
+let autoExtractRunning = false;
+let autoExtractMode = 'full'; // 'full'=全自动不暂停, 'semi'=半自动遇新映射暂停
+let autoExtractStats = { success: 0, failed: 0, skipped: 0 };
+
+// ==================== 尺寸字段定义 ====================
+const SIZE_SUFFIXES = [
+  { suffix: '_min',     label: '最小',     desc: '典型范围下限' },
+  { suffix: '_max',     label: '最大',     desc: '典型范围上限' },
+  { suffix: '_abs_min', label: '极端最小', desc: '括号内下限极值' },
+  { suffix: '_abs_max', label: '极端最大', desc: '括号内上限极值' },
+  { suffix: '_avg',     label: '平均',     desc: '自动计算 (极端最小+极端最大)/2' }
+];
+
+// 判断是否为尺寸基础名（如 leaf_size_length, 叶长, 叶宽cm）
+function isSizeBaseName(keyOrLabel) {
+  let l = String(keyOrLabel).toLowerCase();
+  // 已经是子字段的不算
+  if (SIZE_SUFFIXES.some(ss => l.endsWith(ss.suffix))) return false;
+  // 去除末尾单位后缀（cm, mm, m, 厘米, 毫米等）
+  l = l.replace(/(cm|mm|m|厘米|毫米|米)$/i, '');
+  const original = String(keyOrLabel).replace(/(cm|mm|m|厘米|毫米|米)$/i, '');
+  // 英文模式
+  if (/_size_(length|width|height|diam|depth|thickness)$/.test(l)) return true;
+  if (/(^|_)(length|width|height|diam|depth|thickness)$/.test(l)) return true;
+  // 中文模式
+  if (/(叶片?长|叶宽|株高|花径|果径|叶柄长|花梗长|花冠直径|萼筒长|花丝长|裂片长|果长|果宽|枝长|刺长)$/.test(original)) return true;
+  if (/(长|宽|高|直径|厚度)$/.test(original) && !/(最小|最大|极端|平均|范围)$/.test(original)) return true;
+  return false;
+}
+
+// 从子字段名提取基础名（如 leaf_size_length_min → leaf_size_length）
+function getSizeBaseFromKey(key) {
+  const l = String(key).toLowerCase();
+  for (const ss of SIZE_SUFFIXES) {
+    if (l.endsWith(ss.suffix)) return key.slice(0, -ss.suffix.length);
+  }
+  return null;
+}
+
+// ==================== 工具函数 ====================
+function fieldDomId(key) {
+  return 'field_' + String(key).replace(/[\s]+/g, '_');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function showStatus(msg, type) {
+  const bar = document.getElementById('statusBar');
+  bar.className = 'status-bar ' + type;
+  bar.textContent = msg;
+  if (type === 'success' || type === 'info') {
+    setTimeout(() => { bar.className = 'status-bar'; }, 4000);
+  }
+}
+
+// 判断是否为taxon字段
+function isTaxonField(label) {
+  const l = label.trim().toLowerCase();
+  return l === 'taxon' || l === 'species' || l === '学名' || l === '物种学名' || l === '物种' || l === '拉丁名' || l === 'scientific name';
+}
+
+// 从CSV表头生成字段配置
+function createFieldsFromHeaders(headers) {
+  FIELD_CONFIG = [];
+  const existingKeys = new Set();
+
+  function addField(f) {
+    if (!existingKeys.has(f.key)) {
+      existingKeys.add(f.key);
+      FIELD_CONFIG.push(f);
+    }
+  }
+
+  headers.forEach((h) => {
+    const label = h.trim();
+    if (!label) return;
+    const safeKey = label.replace(/[\s\-\/\\\(\)（）]+/g, '_').replace(/[^\w\u4e00-\u9fa5]/g, '');
+    const taxon = isTaxonField(label);
+
+    // taxon字段
+    if (taxon) {
+      addField({ key: safeKey, label, type: 'string', group: '性状字段', originalName: label, isTaxon: true, desc: '', standardExamples: [] });
+      return;
+    }
+
+    // 检查是否是尺寸子字段（如 leaf_size_length_min）
+    const sizeBase = getSizeBaseFromKey(safeKey);
+    if (sizeBase) {
+      const suffix = safeKey.slice(sizeBase.length);
+      const ss = SIZE_SUFFIXES.find(s => s.suffix === suffix);
+      addField({
+        key: safeKey, label, type: 'number', group: '性状字段', originalName: label,
+        isTaxon: false, desc: '', standardExamples: [],
+        sizeBase: sizeBase, sizeSuffix: suffix,
+        sizeLabel: ss ? ss.label : suffix, isAutoAvg: suffix === '_avg'
+      });
+      return;
+    }
+
+    // 检查是否是尺寸基础名（如 leaf_size_length）
+    if (isSizeBaseName(safeKey)) {
+      // 创建基础字段（虚拟字段，用于导出平均值）
+      addField({
+        key: safeKey, label, type: 'number', group: '性状字段', originalName: label,
+        isTaxon: false, desc: '', standardExamples: [], isSizeBase: true
+      });
+      // 自动创建5个子字段
+      SIZE_SUFFIXES.forEach(ss => {
+        const subKey = safeKey + ss.suffix;
+        addField({
+          key: subKey, label: label + '-' + ss.label, type: 'number', group: '性状字段',
+          originalName: subKey, isTaxon: false, desc: '', standardExamples: [],
+          sizeBase: safeKey, sizeSuffix: ss.suffix, sizeLabel: ss.label,
+          isAutoAvg: ss.suffix === '_avg', fromBaseExpand: true
+        });
+      });
+      return;
+    }
+
+    // 普通字段 - 自动推断类型
+    let type = 'string';
+    if (/颜色|color|colour|花色|果色|枝色|叶色|被毛|毛被/i.test(label)) type = 'list';
+    else if (/形状|shape|形态|叶形|果形|花形|萼形|冠形|裂片|先端|叶基|base|apex/i.test(label)) type = 'list';
+    else if (/类型|type|习性|habit|质地|texture|叶缘|margin|着生|排列|inflorescence|花序/i.test(label)) type = 'list';
+    else if (/数量|number|count/i.test(label)) type = 'number';
+    // 注意：尺寸相关的已经在上面处理了，这里不再推断为number
+
+    addField({ key: safeKey, label, type, group: '性状字段', originalName: label, isTaxon: false, desc: '', standardExamples: [] });
+  });
+}
+
+// ==================== CSV 导入 ====================
+function handleCsvImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const buffer = e.target.result;
+      const text = decodeTextBuffer(buffer);
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 1) {
+        showStatus('CSV文件为空', 'error');
+        return;
+      }
+
+      function parseCsvLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i+1] === '"') { current += '"'; i++; }
+            else inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current); current = '';
+          } else { current += char; }
+        }
+        result.push(current);
+        return result;
+      }
+
+      const headers = parseCsvLine(lines[0]).map(h => h.trim());
+      createFieldsFromHeaders(headers);
+      saveFieldConfigToStorage();
+
+      const taxonField = FIELD_CONFIG.find(f => f.isTaxon);
+      const traitCount = FIELD_CONFIG.filter(f => !f.isTaxon && !f.isSizeBase).length;
+
+      if (lines.length < 2) {
+        renderFieldGroups();
+        renderRecordsTable();
+        updateFieldFillCount();
+        showStatus(`✅ 已配置 ${traitCount} 个性状字段${taxonField ? '（含物种学名）' : ''}（无数据行）`, 'success');
+        return;
+      }
+
+      // 导入数据行
+      const imported = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCsvLine(lines[i]);
+        const record = {};
+        headers.forEach((h, idx) => {
+          const field = FIELD_CONFIG.find(f => f.originalName === h.trim());
+          if (!field) return;
+          const val = (values[idx] || '').trim();
+          if (field.isTaxon) {
+            record.taxon = val;
+          } else if (field.isSizeBase) {
+            // 尺寸基础字段：值存到avg子字段
+            record[field.key + '_avg'] = val;
+          } else {
+            record[field.key] = val;
+          }
+        });
+
+        // 转换列表格式 ['a','b'] -> a, b
+        FIELD_CONFIG.forEach(f => {
+          if (f.isTaxon) return;
+          if (f.type === 'list' && record[f.key]) {
+            const m = record[f.key].match(/^\[(.*)\]$/);
+            if (m) {
+              const items = m[1].split(',').map(s => {
+                s = s.trim();
+                if ((s.startsWith("'") && s.endsWith("'")) || (s.startsWith('"') && s.endsWith('"'))) return s.slice(1, -1);
+                return s;
+              }).filter(s => s);
+              record[f.key] = items.join(', ');
+            }
+          }
+        });
+
+        if (record.taxon || Object.keys(record).some(k => k !== 'taxon' && record[k])) {
+          imported.push(record);
+        }
+      }
+
+      records = records.concat(imported);
+      renderFieldGroups();
+      renderRecordsTable();
+      updateFieldFillCount();
+      showStatus(`✅ 已导入 ${imported.length} 条记录，${traitCount} 个性状字段${taxonField ? '（含物种学名）' : ''}`, 'success');
+    } catch (err) {
+      showStatus('导入失败: ' + err.message, 'error');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
+}
+
+// ==================== 映射表 CSV 导入 ====================
+function handleMappingImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const buffer = e.target.result;
+      const text = decodeTextBuffer(buffer);
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) {
+        showStatus('映射表CSV至少需要表头和一行数据', 'error');
+        return;
+      }
+
+      function parseCsvLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i+1] === '"') { current += '"'; i++; }
+            else inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current); current = '';
+          } else { current += char; }
+        }
+        result.push(current);
+        return result;
+      }
+
+      const headers = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+      // 确定列索引：支持 trait/field, original/from, standard/to 等列名
+      const traitIdx = headers.findIndex(h => h === 'trait' || h === 'field' || h === '字段' || h === '性状');
+      const origIdx = headers.findIndex(h => h === 'original' || h === 'from' || h === '原始' || h === '原始值');
+      const stdIdx = headers.findIndex(h => h === 'standard' || h === 'to' || h === '标准' || h === '标准值' || h === '归类');
+
+      if (traitIdx < 0 || origIdx < 0 || stdIdx < 0) {
+        showStatus('映射表CSV需要包含 trait, original, standard 三列', 'error');
+        return;
+      }
+
+      // 按性状分组收集映射
+      const traitMappings = {};  // { traitKey: [{original, standard}] }
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        const trait = (cols[traitIdx] || '').trim();
+        const original = (cols[origIdx] || '').trim();
+        const standard = (cols[stdIdx] || '').trim();
+        if (!trait || !original || !standard) continue;
+        if (!traitMappings[trait]) traitMappings[trait] = [];
+        traitMappings[trait].push({ original, standard });
+      }
+
+      // 应用到字段配置和映射缓存
+      let updatedCount = 0;
+      let mappingCount = 0;
+      Object.keys(traitMappings).forEach(traitKey => {
+        const field = FIELD_CONFIG.find(f => f.key === traitKey || f.originalName === traitKey || f.label === traitKey);
+        if (!field) return;
+
+        const mappings = traitMappings[traitKey];
+        // 设置标准示例（去重）
+        const standards = [...new Set(mappings.map(m => m.standard))];
+        field.standardExamples = standards;
+
+        // 存入映射缓存
+        if (!MAPPING_CACHE[field.key]) MAPPING_CACHE[field.key] = {};
+        mappings.forEach(m => {
+          MAPPING_CACHE[field.key][m.original] = m.standard;
+          mappingCount++;
+        });
+        updatedCount++;
+      });
+
+      // 保存
+      saveFieldConfigToStorage();
+      saveMappingCache();
+
+      showStatus(`✅ 已导入映射表：更新 ${updatedCount} 个性状，${mappingCount} 条映射关系`, 'success');
+    } catch (err) {
+      showStatus('映射表导入失败: ' + err.message, 'error');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
+}
+
+// ==================== 字段配置CSV导入 ====================
+function handleFieldConfigImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const buffer = e.target.result;
+      const text = decodeTextBuffer(buffer);
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) {
+        showStatus('配置CSV至少需要表头和一行数据', 'error');
+        return;
+      }
+
+      function parseCsvLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i+1] === '"') { current += '"'; i++; }
+            else inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current); current = '';
+          } else { current += char; }
+        }
+        result.push(current);
+        return result;
+      }
+
+      const headers = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+      // 识别列索引
+      const fieldIdx = headers.findIndex(h => h === 'field' || h === 'key' || h === '字段' || h === '性状' || h === '字段名' || h === 'trait');
+      const descIdx = headers.findIndex(h => h === 'desc' || h === 'description' || h === '说明' || h === '提取说明' || h === 'ai说明' || h === '描述');
+      const stdIdx = headers.findIndex(h => h === 'standard' || h === 'examples' || h === '标准词' || h === '标准示例' || h === '标准描述' || h === 'standard_examples' || h === 'standardexamples');
+
+      if (fieldIdx < 0) {
+        showStatus('配置CSV需要包含 field（字段名）列', 'error');
+        return;
+      }
+
+      // 解析标准词：支持分号、逗号、竖线分隔
+      function parseStandards(str) {
+        if (!str) return [];
+        str = str.trim();
+        // 优先用分号或竖线分隔，其次用逗号（但CSV中逗号可能是列分隔符，所以通常用分号）
+        if (str.includes(';')) return str.split(';').map(s => s.trim()).filter(s => s);
+        if (str.includes('|')) return str.split('|').map(s => s.trim()).filter(s => s);
+        // 单个值或逗号分隔的多个值
+        return str.split(',').map(s => s.trim()).filter(s => s);
+      }
+
+      let updatedCount = 0;
+      let notFound = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        const fieldName = (cols[fieldIdx] || '').trim();
+        if (!fieldName) continue;
+
+        // 匹配字段（key/label/originalName）
+        const field = FIELD_CONFIG.find(f =>
+          f.key === fieldName || f.label === fieldName || f.originalName === fieldName
+        );
+
+        if (!field) {
+          notFound.push(fieldName);
+          continue;
+        }
+
+        // 更新提取说明
+        if (descIdx >= 0) {
+          const desc = (cols[descIdx] || '').trim();
+          field.desc = desc;
+        }
+
+        // 更新标准词（合并stdIdx之后的所有列，兼容标准词用逗号分隔但未加引号的情况）
+        if (stdIdx >= 0) {
+          const stdParts = cols.slice(stdIdx).map(s => (s || '').trim()).filter(s => s);
+          const stdStr = stdParts.join(',');
+          field.standardExamples = parseStandards(stdStr);
+        }
+
+        updatedCount++;
+      }
+
+      // 保存并重新渲染
+      saveFieldConfigToStorage();
+      openFieldConfig(); // 重新渲染配置表格
+
+      let msg = `✅ 已导入配置：更新 ${updatedCount} 个字段`;
+      if (notFound.length > 0) {
+        msg += `，${notFound.length} 个字段未匹配（${notFound.slice(0,3).join('、')}${notFound.length > 3 ? '...' : ''}）`;
+      }
+      showStatus(msg, 'success');
+    } catch (err) {
+      showStatus('配置导入失败: ' + err.message, 'error');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
+}
+
+// ==================== 字段配置持久化 ====================
+function saveFieldConfigToStorage() {
+  try { localStorage.setItem('plantTraitInitFields', JSON.stringify(FIELD_CONFIG)); } catch(e) {}
+}
+
+function loadFieldConfigFromStorage() {
+  try {
+    const saved = localStorage.getItem('plantTraitInitFields');
+    if (saved) {
+      FIELD_CONFIG = JSON.parse(saved);
+      FIELD_CONFIG.forEach(f => {
+        if (f.isTaxon === undefined) f.isTaxon = isTaxonField(f.label || f.originalName || f.key);
+        if (f.desc === undefined) f.desc = '';
+        if (f.standardExamples === undefined) f.standardExamples = [];
+        if (f.isSizeBase === undefined) f.isSizeBase = false;
+        if (f.sizeBase === undefined) f.sizeBase = null;
+      });
+    }
+    const savedCache = localStorage.getItem('plantTraitInitMappingCache');
+    if (savedCache) MAPPING_CACHE = JSON.parse(savedCache);
+    return FIELD_CONFIG.length > 0;
+  } catch(e) {}
+  return false;
+}
+
+function saveMappingCache() {
+  try { localStorage.setItem('plantTraitInitMappingCache', JSON.stringify(MAPPING_CACHE)); } catch(e) {}
+}
+
+// ==================== 字段配置模态框 ====================
+function openFieldConfig() {
+  if (FIELD_CONFIG.length === 0) {
+    showStatus('请先导入CSV文件定义字段', 'error');
+    return;
+  }
+  const container = document.getElementById('fieldConfigContent');
+  let html = '<div style="margin-bottom:10px;padding:8px 12px;background:#fff8e1;border-left:3px solid #f39c12;border-radius:4px;font-size:12px;color:#7a5c00;">💡 <strong>标准词</strong>：设置后，AI提取时会自动将文本中的各种描述归类到这些标准词，并生成「原始词→标准词」映射表供你检查确认。例如萼筒形状设置：钟形, 圆柱形, 杯形</div>';
+  html += '<table class="field-config-table"><thead><tr><th style="width:16%">字段名</th><th style="width:12%">类型</th><th style="width:12%">分组</th><th style="width:28%">AI提取说明</th><th style="width:32%">标准词（逗号分隔，AI自动归类）</th></tr></thead><tbody>';
+  FIELD_CONFIG.forEach((f, i) => {
+    // 尺寸基础字段（虚拟）不在配置中显示
+    if (f.isSizeBase) return;
+    const examplesStr = (f.standardExamples || []).join(', ');
+    const isSizeSub = !!f.sizeBase;
+    const typeSelect = isSizeSub
+      ? `<span style="color:#888;font-size:11px;">数值（固定）</span>`
+      : `<select onchange="FIELD_CONFIG[${i}].type=this.value">
+        <option value="string" ${f.type==='string'?'selected':''}>文本 S</option>
+        <option value="list" ${f.type==='list'?'selected':''}>列表 L</option>
+        <option value="number" ${f.type==='number'?'selected':''}>数值 N</option>
+      </select>`;
+    const badge = f.isTaxon ? ' <span style="color:#2d6a4f;font-size:10px;">[物种名]</span>' :
+                  isSizeSub ? ` <span style="color:#2d6a4f;font-size:10px;">[尺寸-${f.sizeLabel}]</span>` : '';
+    html += `<tr>
+      <td>${escapeHtml(f.label)}${badge}</td>
+      <td>${typeSelect}</td>
+      <td><input type="text" value="${escapeHtml(f.group)}" onchange="FIELD_CONFIG[${i}].group=this.value"></td>
+      <td><input type="text" value="${escapeHtml(f.desc || '')}" placeholder="如：叶片的形状" onchange="FIELD_CONFIG[${i}].desc=this.value"></td>
+      <td><input type="text" value="${escapeHtml(examplesStr)}" placeholder="${isSizeSub ? '数值字段无需示例' : '如：红色, 白色, 黄色'}" ${isSizeSub ? 'disabled style="background:#f5f5f5;"' : ''} onchange="FIELD_CONFIG[${i}].standardExamples=this.value.split(',').map(s=>s.trim()).filter(s=>s)"></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+  document.getElementById('fieldConfigModal').classList.add('active');
+}
+
+function closeFieldConfig() {
+  document.getElementById('fieldConfigModal').classList.remove('active');
+}
+
+function saveFieldConfig() {
+  saveFieldConfigToStorage();
+  renderFieldGroups();
+  renderRecordsTable();
+  updateFieldFillCount();
+  closeFieldConfig();
+  showStatus('字段配置已保存', 'success');
+}
+
+// ==================== 渲染字段编辑区 ====================
+function renderFieldGroups() {
+  const container = document.getElementById('fieldGroups');
+  // 可编辑字段：排除taxon和尺寸基础字段（虚拟）
+  const editableFields = FIELD_CONFIG.filter(f => !f.isTaxon && !f.isSizeBase);
+  document.getElementById('fieldTotalCount').textContent = editableFields.length;
+
+  if (FIELD_CONFIG.length === 0) {
+    container.innerHTML = document.getElementById('welcomeBox')?.outerHTML || '<div class="welcome-box">请先导入CSV</div>';
+    return;
+  }
+
+  // 找出所有尺寸基础字段
+  const sizeBaseFields = FIELD_CONFIG.filter(f => f.isSizeBase);
+  const sizeBaseKeys = new Set(sizeBaseFields.map(f => f.key));
+
+  // 按分组组织
+  const groups = {};
+  editableFields.forEach(f => {
+    if (!groups[f.group]) groups[f.group] = [];
+    groups[f.group].push(f);
+  });
+
+  let html = '';
+  Object.keys(groups).forEach(group => {
+    const fields = groups[group];
+    // 分离尺寸子字段（有对应基础字段的）和普通字段
+    const sizeSubFields = fields.filter(f => f.sizeBase && sizeBaseKeys.has(f.sizeBase));
+    const normalFields = fields.filter(f => !(f.sizeBase && sizeBaseKeys.has(f.sizeBase)));
+
+    // 按sizeBase分组尺寸子字段
+    const sizeGroups = {};
+    sizeSubFields.forEach(f => {
+      if (!sizeGroups[f.sizeBase]) sizeGroups[f.sizeBase] = [];
+      sizeGroups[f.sizeBase].push(f);
+    });
+
+    const totalCount = normalFields.length + Object.keys(sizeGroups).length;
+    html += `<div class="field-group">
+      <div class="group-title">${escapeHtml(group)}（${totalCount}项）</div>
+      <div class="field-grid">`;
+
+    // 普通字段
+    normalFields.forEach(f => {
+      const typeClass = 'type-' + f.type;
+      const typeLabel = f.type === 'list' ? 'L' : f.type === 'number' ? 'N' : 'S';
+      const placeholder = f.type === 'list' ? '多值用逗号分隔' : f.type === 'number' ? '数值' : '';
+      const descTitle = f.desc ? `\nAI说明: ${f.desc}` : '';
+      html += `<div class="field-item">
+        <label class="field-label clickable" onclick="handleFieldLabelClick('${f.key}')" title="有选中文本时点击填入；无选中文本时点击高亮/取消高亮来源${descTitle}">
+          ${escapeHtml(f.label)}
+          ${f.desc ? '<span class="desc-icon" title="' + escapeHtml(f.desc) + '">ⓘ</span>' : ''}
+          <span class="type-badge ${typeClass}" onclick="event.stopPropagation();cycleType('${f.key}')" title="点击切换类型">${typeLabel}</span>
+        </label>
+        <input type="text" class="field-input ${f.type}" id="${fieldDomId(f.key)}" placeholder="${placeholder}" oninput="updateFieldFillCount()">
+      </div>`;
+    });
+
+    html += '</div>'; // 关闭field-grid
+
+    // 尺寸折叠组（在grid外面，占整行）
+    Object.keys(sizeGroups).forEach(baseKey => {
+      const baseField = FIELD_CONFIG.find(f => f.key === baseKey);
+      const subs = sizeGroups[baseKey];
+      const baseLabel = baseField ? baseField.label : baseKey;
+      html += `<div class="size-group collapsed" id="sizeGroup_${baseKey}">
+        <div class="size-group-header" onclick="toggleSizeGroup('${baseKey}')">
+          <span>📐 ${escapeHtml(baseLabel)} <span style="font-weight:normal;color:#888;font-size:10px;">（尺寸字段，展开查看5个子值）</span></span>
+          <span class="toggle">▼</span>
+        </div>
+        <div class="size-group-content">`;
+      subs.forEach(f => {
+        const isAvg = f.sizeSuffix === '_avg';
+        html += `<div class="field-item">
+          <label class="field-label clickable" onclick="handleFieldLabelClick('${f.key}')" title="${f.sizeLabel}${f.isAutoAvg ? '（自动计算）' : ''}\n点击高亮来源">
+            ${escapeHtml(f.sizeLabel)}
+            ${isAvg ? '<span class="avg-badge">自动</span>' : ''}
+          </label>
+          <input type="text" class="field-input number" id="${fieldDomId(f.key)}" placeholder="cm" ${isAvg ? 'readonly style="background:#f5f5f5;"' : 'oninput="recalcSizeAverages();updateFieldFillCount()"'}}>
+        </div>`;
+      });
+      html += '</div></div>';
+    });
+
+    html += '</div>'; // 关闭field-group
+  });
+  container.innerHTML = html;
+}
+
+// 切换尺寸折叠组
+function toggleSizeGroup(baseKey) {
+  const el = document.getElementById('sizeGroup_' + baseKey);
+  if (el) el.classList.toggle('collapsed');
+}
+
+function cycleType(key) {
+  const f = FIELD_CONFIG.find(x => x.key === key);
+  if (!f) return;
+  if (f.sizeBase) {
+    showStatus('尺寸字段类型固定为数值，不可切换', 'info');
+    return;
+  }
+  const types = ['string', 'list', 'number'];
+  f.type = types[(types.indexOf(f.type) + 1) % types.length];
+  saveFieldConfigToStorage();
+  const values = getFieldValues();
+  renderFieldGroups();
+  setFieldValues(values);
+}
+
+// ==================== 高亮功能 ====================
+// 清除所有高亮
+function clearHighlights() {
+  const el = document.getElementById('textInput');
+  if (!el) return;
+  // 移除所有高亮span，保留文本内容
+  el.querySelectorAll('.trait-highlight').forEach(span => {
+    const parent = span.parentNode;
+    while (span.firstChild) {
+      parent.insertBefore(span.firstChild, span);
+    }
+    parent.removeChild(span);
+  });
+  activeHighlightKey = null;
+}
+
+// 从短语中提取关键词（用于部分匹配）
+function extractKeywordsFromPhrase(phrase) {
+  const keywords = [];
+  // 提取数字+单位组合（如 4-8cm, 2.5cm）
+  const sizeMatches = phrase.match(/\d+(\.\d+)?[\-–—~]\d+(\.\d+)?(\s*(cm|mm|m))?/g);
+  if (sizeMatches) sizeMatches.forEach(m => keywords.push(m));
+  // 提取单个数字+单位
+  const numMatches = phrase.match(/\d+(\.\d+)?\s*(cm|mm|m)/g);
+  if (numMatches) numMatches.forEach(m => keywords.push(m));
+  // 提取中文描述词（叶、花、果、长、宽等）
+  const descMatches = phrase.match(/[叶花果枝萼冠瓣蕊梗刺][长宽高直径厚]?/g);
+  if (descMatches) descMatches.forEach(m => { if (m.length >= 2) keywords.push(m); });
+  // 如果没有提取到，用空格分割
+  if (keywords.length === 0) {
+    phrase.split(/[\s,，、;；]+/).forEach(w => { if (w.length >= 2) keywords.push(w); });
+  }
+  return [...new Set(keywords)];
+}
+
+// 高亮指定字段的来源文本（优先用AI返回的原文片段匹配）
+function highlightField(key) {
+  const el = document.getElementById('textInput');
+  if (!el) return;
+
+  if (activeHighlightKey === key) {
+    clearHighlights();
+    return;
+  }
+
+  clearHighlights();
+
+  const fullText = el.textContent;
+  if (!fullText || fullText.length === 0) {
+    showStatus('文本框为空', 'info');
+    return;
+  }
+
+  const field = FIELD_CONFIG.find(f => f.key === key);
+  const fieldLabel = field?.label || key;
+
+  // 优先使用AI返回的原文片段
+  let searchPhrases = FIELD_SOURCES[key] || [];
+
+  // 尺寸子字段：如果自己没有来源，用基础字段的
+  if (searchPhrases.length === 0 && field && field.sizeBase && FIELD_SOURCES[field.sizeBase]) {
+    searchPhrases = FIELD_SOURCES[field.sizeBase];
+    console.log(`尺寸子字段 ${key} 使用基础字段 ${field.sizeBase} 的来源`);
+  }
+
+  // 如果没有AI返回的原文片段，用字段值作为fallback
+  if (searchPhrases.length === 0) {
+    const fieldEl = document.getElementById(fieldDomId(key));
+    const fieldValue = fieldEl ? fieldEl.value.trim() : '';
+    if (fieldValue) {
+      const isList = field && field.type === 'list';
+      if (isList) {
+        searchPhrases = fieldValue.split(/[,，、;；]/).map(s => s.trim()).filter(s => s.length >= 2);
+      } else {
+        searchPhrases = [fieldValue];
+      }
+    }
+  }
+
+  if (searchPhrases.length === 0) {
+    showStatus(`「${fieldLabel}」没有可高亮的来源信息`, 'info');
+    return;
+  }
+
+  console.log('=== 高亮开始 ===');
+  console.log('字段:', key, fieldLabel);
+  console.log('搜索短语:', searchPhrases);
+
+  // 植物学同义词扩展表
+  const SYNONYMS = {
+    'fruit': ['fruit', 'drupe', 'berry', 'capsule', 'nut', 'follicle', 'caryopsis', 'samara', 'achene'],
+    'flower': ['flower', 'inflorescence', 'floret', 'bloom'],
+    'leaf': ['leaf', 'leaflet', 'blade', 'foliage'],
+    'branch': ['branch', 'twig', 'shoot', 'stem'],
+    'young': ['young', 'juvenile', 'immature'],
+    'calyx': ['calyx', 'sepal', 'perianth', 'tube', 'limb'],
+    'petal': ['petal', 'corolla'],
+    'style': ['style', 'stigma'],
+    'anther': ['anther', 'stamen', 'filament'],
+    'spine': ['spine', 'thorn', 'prickle', 'thorn'],
+    'lobe': ['lobe', 'segment', 'teeth']
+  };
+
+  // 从字段名提取上下文关键词，并扩展同义词
+  const fieldBaseWords = key.toLowerCase().split(/[_-]/).filter(w =>
+    w.length > 2 && !['size', 'length', 'width', 'min', 'max', 'abs', 'avg'].includes(w)
+  );
+  let contextWords = [...fieldBaseWords];
+  fieldBaseWords.forEach(w => {
+    if (SYNONYMS[w]) contextWords = contextWords.concat(SYNONYMS[w]);
+  });
+  contextWords = [...new Set(contextWords)];
+  console.log('扩展后上下文词:', contextWords);
+
+  // 停用词列表
+  const STOP_WORDS = new Set([
+    'or', 'and', 'the', 'a', 'an', 'is', 'are', 'was', 'were', 'with',
+    'in', 'on', 'of', 'to', 'for', 'by', 'from', 'that', 'this', 'these',
+    'those', 'as', 'at', 'be', 'been', 'have', 'has', 'had', 'not', 'but',
+    'silvery', 'nearly', 'slightly', 'distinctly', 'usually', 'rarely',
+    'color', 'shape', 'surface', 'texture', 'margin', 'apex', 'base',
+    'present', 'absent'
+  ]);
+
+  // 将文本拆分成短语片段（按分号、句号、换行，不按逗号拆太碎）
+  function splitPhrases(text) {
+    const phrases = [];
+    let start = 0;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === ';' || ch === '.' || ch === '\n') {
+        const phrase = text.substring(start, i).trim();
+        if (phrase.length > 5) {
+          phrases.push({ text: phrase, start: start, end: i });
+        }
+        start = i + 1;
+      }
+    }
+    const lastPhrase = text.substring(start).trim();
+    if (lastPhrase.length > 5) {
+      phrases.push({ text: lastPhrase, start: start, end: text.length });
+    }
+    return phrases;
+  }
+
+  const phrases = splitPhrases(fullText);
+  const lowerText = fullText.toLowerCase();
+
+  // 在原文中找到所有匹配位置
+  const matchPositions = [];
+
+  searchPhrases.forEach((phrase, phraseIdx) => {
+    const lowerPhrase = phrase.toLowerCase().trim();
+    // 纯数字（尺寸字段）允许通过，其他的至少2个字符
+    const isNum = /^\d+\.?\d*$/.test(lowerPhrase);
+    if (lowerPhrase.length < 2 && !isNum) return;
+
+    console.log(`  短语 ${phraseIdx+1}:`, phrase);
+
+    let found = false;
+
+    // 第一级：短语级匹配 + 上下文过滤
+    let contextMatched = [];
+    let plainMatched = [];
+
+    phrases.forEach(ph => {
+      const phLower = ph.text.toLowerCase();
+      const hasPhrase = phLower.includes(lowerPhrase);
+      if (!hasPhrase) return;
+
+      // 在这个短语内，找到性状值的精确位置，只高亮那个小片段
+      // 而不是整个短语
+      const valueIdx = phLower.indexOf(lowerPhrase);
+      if (valueIdx >= 0) {
+        // 从性状值位置，扩展到所在的逗号分隔片段
+        const valueStart = ph.start + valueIdx;
+        const valueEnd = valueStart + lowerPhrase.length;
+        let start = valueStart;
+        let end = valueEnd;
+        // 向前扩展到逗号
+        while (start > ph.start && !/[,;]/.test(lowerText[start - 1])) start--;
+        // 向后扩展到逗号
+        while (end < ph.end && !/[,;]/.test(lowerText[end])) end++;
+
+        // 检查是否包含字段上下文关键词
+        const contextHits = contextWords.filter(w => phLower.includes(w));
+        if (contextHits.length >= 1) {
+          contextMatched.push({ start, end, contextHits });
+        } else {
+          plainMatched.push({ start, end });
+        }
+      }
+    });
+
+    console.log(`    上下文匹配: ${contextMatched.length}个, 普通匹配: ${plainMatched.length}个`);
+
+    // 优先用上下文匹配
+    if (contextMatched.length > 0) {
+      contextMatched.forEach(({ start, end, contextHits }) => {
+        matchPositions.push({ start, end, method: '上下文匹配' });
+        found = true;
+        console.log(`    ✓ 上下文匹配 (${contextHits.join(',')}):`, fullText.substring(start, end));
+      });
+    } else if (plainMatched.length > 0) {
+      // 普通匹配最多取2个
+      const maxN = Math.min(2, plainMatched.length);
+      plainMatched.slice(0, maxN).forEach(({ start, end }) => {
+        matchPositions.push({ start, end, method: '普通短语匹配' });
+        found = true;
+        console.log(`    ✓ 普通短语匹配:`, fullText.substring(start, end));
+      });
+    }
+    if (found) return;
+
+    // 第二级：邻近匹配 - 用字段上下文词定位，高亮字段名附近的短语
+    // 特别针对present/absent等二值字段，以及映射后找不到原文的情况
+    // 数值字段（纯数字）也走这个逻辑
+    const isNumber = /^\d+\.?\d*$/.test(lowerPhrase);
+    if (lowerPhrase.length <= 15 || isNumber) {
+      let foundByContext = false;
+
+      // 尺寸字段特殊处理：优先找"字段名 + 数字 + × + 数字 + 单位"的完整短语
+      if (isNumber) {
+        // 遍历所有上下文词，找后面跟着完整尺寸描述的位置
+        for (const ctxWord of contextWords.slice(0, 3)) {
+          if (ctxWord.length < 3 || foundByContext) break;
+          let idx = lowerText.indexOf(ctxWord);
+          while (idx !== -1 && !foundByContext) {
+            // 从这个上下文词位置往后找150字符，看有没有尺寸模式
+            const afterCtx = lowerText.substring(idx, Math.min(idx + 200, lowerText.length));
+            // 匹配数字范围 + × + 数字范围 + 单位
+            const sizeMatch = afterCtx.match(/[\d.\-()–]+\s*[×x]\s*[\d.\-()–]+\s*(cm|mm)/);
+            if (sizeMatch) {
+              // 找到了！高亮从上下文词到单位结束的整个短语
+              const sizeStart = idx;
+              const sizeEnd = idx + sizeMatch.index + sizeMatch[0].length;
+              // 扩展到逗号边界
+              let start = sizeStart;
+              let end = sizeEnd;
+              while (start > 0 && !/[,;.\n]/.test(lowerText[start - 1])) start--;
+              while (end < lowerText.length && !/[,;.\n]/.test(lowerText[end])) end++;
+              matchPositions.push({ start, end, method: '尺寸短语匹配' });
+              foundByContext = true;
+              found = true;
+              console.log(`    ✓ 尺寸短语匹配:`, fullText.substring(start, end));
+              break;
+            }
+            idx = lowerText.indexOf(ctxWord, idx + ctxWord.length);
+          }
+        }
+      }
+
+      if (!foundByContext) {
+        // 优先用最相关的上下文词
+        const primaryContext = contextWords.slice(0, 3);
+        primaryContext.forEach(ctxWord => {
+          if (ctxWord.length < 3 || foundByContext) return;
+          let idx = lowerText.indexOf(ctxWord);
+          while (idx !== -1 && !foundByContext) {
+            // 对于尺寸字段，优先找后面跟着数字的位置（排除植株高度等）
+            if (isNumber) {
+              const afterCtx = lowerText.substring(idx, Math.min(idx + 100, lowerText.length));
+              // 必须在上下文词后面100字符内有数字+单位，才认为是对的位置
+              const hasSizePattern = /\d+\.?\d*\s*(cm|mm)/.test(afterCtx);
+              if (!hasSizePattern) {
+                idx = lowerText.indexOf(ctxWord, idx + ctxWord.length);
+                continue;
+              }
+            }
+            // 从字段名位置开始，高亮它所在的那个逗号分隔的短语
+            let start = idx;
+            let end = idx + ctxWord.length;
+            // 向前扩展到逗号/分号边界
+            while (start > 0 && !/[,;.\n]/.test(lowerText[start - 1])) start--;
+            // 向后扩展到逗号/分号边界
+            while (end < lowerText.length && !/[,;.\n]/.test(lowerText[end])) end++;
+            // 限制最大长度，避免太长
+            if (end - start > 100) {
+              end = start + 100;
+            }
+            matchPositions.push({ start, end, method: '字段邻近匹配' });
+            foundByContext = true;
+            found = true;
+            console.log(`    ✓ 字段邻近匹配: 找到"${ctxWord}"，高亮短语`);
+            console.log(`      高亮内容:`, fullText.substring(start, end));
+            idx = lowerText.indexOf(ctxWord, idx + ctxWord.length);
+          }
+        });
+      }
+      if (found) return;
+    }
+
+    // 第三级：长短语直接匹配
+    if (lowerPhrase.length >= 6) {
+      let idx = lowerText.indexOf(lowerPhrase);
+      let count = 0;
+      while (idx !== -1 && count < 3) {
+        matchPositions.push({ start: idx, end: idx + lowerPhrase.length, method: '直接匹配' });
+        count++;
+        idx = lowerText.indexOf(lowerPhrase, idx + lowerPhrase.length);
+      }
+      if (count > 0) {
+        console.log(`    ✓ 直接匹配: ${count}处`);
+        found = true;
+      }
+    }
+    if (found) return;
+
+    // 第四级：关键词匹配
+    const words = lowerPhrase.split(/\s+/).filter(w =>
+      w.length >= 3 && !STOP_WORDS.has(w) && !/^[\d\-.]+$/.test(w)
+    );
+    console.log(`    提取关键词:`, words);
+
+    if (words.length >= 1) {
+      let kwContextMatched = [];
+      phrases.forEach(ph => {
+        const phLower = ph.text.toLowerCase();
+        const wordHits = words.filter(w => phLower.includes(w));
+        if (wordHits.length >= 1) {
+          const contextHits = contextWords.filter(w => phLower.includes(w));
+          if (contextHits.length >= 1) {
+            kwContextMatched.push({ ph, wordHits });
+          }
+        }
+      });
+
+      if (kwContextMatched.length > 0) {
+        kwContextMatched.forEach(({ ph }) => {
+          matchPositions.push({ start: ph.start, end: ph.end, method: '关键词+上下文' });
+          found = true;
+          console.log(`    ✓ 关键词+上下文匹配:`, ph.text);
+        });
+      }
+    }
+
+    if (!found) {
+      console.log(`    ✗ 所有匹配方式均失败`);
+    }
+  });
+
+  console.log('总共找到匹配位置:', matchPositions.length);
+
+  if (matchPositions.length === 0) {
+    showStatus(`在原文中未找到「${fieldLabel}」的来源描述`, 'info');
+    return;
+  }
+
+  // 合并重叠的位置
+  matchPositions.sort((a, b) => a.start - b.start);
+  const merged = [];
+  matchPositions.forEach(p => {
+    if (merged.length > 0 && p.start <= merged[merged.length - 1].end + 1) {
+      merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, p.end);
+    } else {
+      merged.push({ ...p });
+    }
+  });
+
+  console.log('合并后位置:', merged.length, '个片段');
+
+  // 从后往前高亮
+  merged.reverse().forEach(src => {
+    if (src.start < 0 || src.end > fullText.length || src.start >= src.end) return;
+
+    const range = document.createRange();
+    let startNode = null, startOffset = 0, endNode = null, endOffset = 0;
+    let charCount = 0;
+
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while (node = walker.nextNode()) {
+      const nodeLen = node.textContent.length;
+      if (!startNode && charCount + nodeLen > src.start) {
+        startNode = node;
+        startOffset = src.start - charCount;
+      }
+      if (!endNode && charCount + nodeLen >= src.end) {
+        endNode = node;
+        endOffset = src.end - charCount;
+        break;
+      }
+      charCount += nodeLen;
+    }
+
+    if (startNode && endNode) {
+      try {
+        range.setStart(startNode, startOffset);
+        range.setEnd(endNode, endOffset);
+        const span = document.createElement('span');
+        span.className = 'trait-highlight active';
+        span.setAttribute('data-field', key);
+        span.title = `匹配方式: ${src.method || '未知'}`;
+        range.surroundContents(span);
+      } catch (e) {
+        console.warn('高亮失败:', key, src, e);
+      }
+    }
+  });
+
+  activeHighlightKey = key;
+
+  const firstHighlight = el.querySelector('.trait-highlight');
+  if (firstHighlight) {
+    firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  showStatus(`已高亮「${fieldLabel}」的来源描述（${merged.length}处，再次点击取消）`, 'info');
+}
+
+// ==================== 划词功能 ====================
+const textInputEl = document.getElementById('textInput');
+textInputEl.addEventListener('mouseup', function() { setTimeout(updateSelection, 10); });
+textInputEl.addEventListener('keyup', function(e) {
+  if (e.key.startsWith('Arrow') || e.key === 'Shift') setTimeout(updateSelection, 10);
+});
+
+// 点击文本框和字段标签以外的区域时，清空选区（避免过期选区导致点击字段标签时误填入）
+document.addEventListener('click', function(e) {
+  // 如果点击的是字段标签或其子元素，不清空（让handleFieldLabelClick先处理填入）
+  if (e.target.closest('.field-label')) return;
+  // 如果点击在文本框内，不清空
+  if (textInputEl.contains(e.target)) return;
+  // 其他情况清空选区
+  clearSelection();
+});
+
+function updateSelection() {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+    // 确保选区在textInput内
+    const range = sel.getRangeAt(0);
+    if (textInputEl.contains(range.commonAncestorContainer)) {
+      currentSelection = sel.toString().trim();
+      if (currentSelection) {
+        document.getElementById('selectionBar').classList.add('active');
+        document.getElementById('selectionText').textContent = currentSelection.substring(0, 60) + (currentSelection.length > 60 ? '...' : '');
+        return;
+      }
+    }
+  }
+  currentSelection = '';
+  document.getElementById('selectionBar').classList.remove('active');
+}
+
+function clearSelection() {
+  currentSelection = '';
+  document.getElementById('selectionBar').classList.remove('active');
+}
+
+function fillFromSelection(key) {
+  if (!currentSelection) {
+    showStatus('请先在左侧文本框中选中一段文字', 'info');
+    return;
+  }
+  const el = document.getElementById(fieldDomId(key));
+  if (!el) return;
+  const f = FIELD_CONFIG.find(x => x.key === key);
+  if (el.value.trim()) {
+    const sep = f.type === 'list' ? ', ' : '；';
+    el.value = el.value.trim() + sep + currentSelection;
+  } else {
+    el.value = currentSelection;
+  }
+  updateFieldFillCount();
+  showStatus(`已填入「${f.label}」`, 'success');
+}
+
+// 字段标签点击：有选中文本则填入，无则高亮/取消高亮来源
+function handleFieldLabelClick(key) {
+  if (currentSelection && currentSelection.trim()) {
+    fillFromSelection(key);
+  } else {
+    // 尺寸子字段：优先用基础字段的来源
+    const field = FIELD_CONFIG.find(f => f.key === key);
+    if (field && field.sizeBase && FIELD_SOURCES[field.sizeBase]) {
+      highlightField(field.sizeBase);
+    } else {
+      highlightField(key);
+    }
+  }
+}
+
+// ==================== 字段值读写 ====================
+function getFieldValues() {
+  const values = {};
+  values.taxon = document.getElementById('taxonInput').value.trim();
+  FIELD_CONFIG.forEach(f => {
+    if (f.isTaxon || f.isSizeBase) return; // 排除taxon和尺寸基础字段（虚拟）
+    const el = document.getElementById(fieldDomId(f.key));
+    if (el) values[f.key] = el.value.trim();
+  });
+  return values;
+}
+
+function setFieldValues(values) {
+  document.getElementById('taxonInput').value = values.taxon || '';
+  FIELD_CONFIG.forEach(f => {
+    if (f.isTaxon || f.isSizeBase) return;
+    const el = document.getElementById(fieldDomId(f.key));
+    if (el) el.value = values[f.key] || '';
+  });
+  // 自动计算尺寸字段的avg
+  recalcSizeAverages();
+  updateFieldFillCount();
+}
+
+// 自动计算所有尺寸字段的平均值（用极端最小和极端最大计算）
+function recalcSizeAverages() {
+  const sizeBases = new Set();
+  FIELD_CONFIG.forEach(f => {
+    if (f.sizeBase) sizeBases.add(f.sizeBase);
+  });
+  sizeBases.forEach(base => {
+    const absMinEl = document.getElementById(fieldDomId(base + '_abs_min'));
+    const absMaxEl = document.getElementById(fieldDomId(base + '_abs_max'));
+    const avgEl = document.getElementById(fieldDomId(base + '_avg'));
+    if (avgEl && absMinEl && absMaxEl) {
+      const absMin = parseFloat(absMinEl.value);
+      const absMax = parseFloat(absMaxEl.value);
+      if (!isNaN(absMin) && !isNaN(absMax) && absMax >= absMin) {
+        const avg = (absMin + absMax) / 2;
+        // 按实际精度显示，不强制保留小数位
+        // 如果是整数就显示整数，否则显示原始精度
+        avgEl.value = Number.isInteger(avg) ? String(avg) : String(avg);
+      }
+    }
+  });
+}
+
+function clearFields() {
+  document.getElementById('taxonInput').value = '';
+  FIELD_CONFIG.forEach(f => {
+    if (f.isTaxon || f.isSizeBase) return;
+    const el = document.getElementById(fieldDomId(f.key));
+    if (el) el.value = '';
+  });
+  editingIndex = -1;
+  FIELD_SOURCES = {};
+  clearHighlights();
+  updateFieldFillCount();
+  showStatus('已清空字段', 'info');
+}
+
+function clearText() {
+  document.getElementById('textInput').innerHTML = '';
+  document.getElementById('charCount').textContent = '0 字';
+  clearSelection();
+  clearHighlights();
+}
+
+document.getElementById('textInput').addEventListener('input', function() {
+  document.getElementById('charCount').textContent = this.textContent.length + ' 字';
+});
+
+// 粘贴时只保留纯文本
+document.getElementById('textInput').addEventListener('paste', function(e) {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  document.execCommand('insertText', false, text);
+  clearHighlights();
+});
+
+function updateFieldFillCount() {
+  const values = getFieldValues();
+  let filled = 0;
+  const editableFields = FIELD_CONFIG.filter(f => !f.isTaxon && !f.isSizeBase);
+  const total = editableFields.length + 1;
+  editableFields.forEach(f => {
+    if (values[f.key] && values[f.key] !== '') filled++;
+  });
+  if (values.taxon) filled++;
+  document.getElementById('fieldFillCount').textContent = `已填 ${filled} / ${total}`;
+
+  editableFields.forEach(f => {
+    const el = document.getElementById(fieldDomId(f.key));
+    if (el) {
+      if (el.value.trim()) el.classList.add('has-value');
+      else el.classList.remove('has-value');
+    }
+  });
+}
+
+// ==================== 网页URL抓取 ====================
+async function fetchWebpage() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) { showStatus('请输入网页URL', 'error'); return; }
+
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.textContent = '抓取中...';
+  showStatus('正在抓取网页内容...', 'loading');
+
+  try {
+    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+    const response = await fetch(proxyUrl);
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+
+    const html = await response.text();
+    const text = extractTextFromHtml(html);
+
+    if (!text || text.length < 10) throw new Error('未能从页面提取到有效文本');
+
+    document.getElementById('textInput').textContent = text;
+    document.getElementById('charCount').textContent = text.length + ' 字';
+    clearHighlights();
+    showStatus(`✅ 抓取成功！已提取 ${text.length} 字，请检查后提取性状。`, 'success');
+  } catch (err) {
+    console.error('抓取失败:', err);
+    showStatus(`抓取失败（${err.message}）。可能是跨域限制或网站禁止抓取。请手动复制网页内容粘贴到文本框。`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '抓取';
+  }
+}
+
+function extractTextFromHtml(html) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    doc.querySelectorAll('script, style, nav, footer, header, noscript, iframe, svg, form, button').forEach(el => el.remove());
+    let mainEl = doc.querySelector('main') || doc.querySelector('article') || doc.querySelector('.content') || doc.querySelector('#content') || doc.querySelector('.mw-parser-output') || doc.body;
+    let text = mainEl ? mainEl.innerText : doc.documentElement.innerText;
+    text = text.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim();
+    return text;
+  } catch(e) { return ''; }
+}
+
+// ==================== AI 提取 ====================
+async function extractTraits() {
+  const editableFields = FIELD_CONFIG.filter(f => !f.isTaxon && !f.isSizeBase);
+  if (editableFields.length === 0) {
+    showStatus('请先导入CSV文件定义性状字段', 'error');
+    return;
+  }
+
+  const text = document.getElementById('textInput').textContent.trim();
+  if (!text) {
+    showStatus('请先粘贴植物描述文本或抓取网页', 'error');
+    return;
+  }
+
+  const settings = getSettings();
+  if (!settings.apiKey || !settings.apiModel) {
+    showStatus('请先在"API设置"中配置 API Key 和模型', 'error');
+    openSettings();
+    return;
+  }
+
+  const btn = document.getElementById('extractBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span> 提取中...';
+  showStatus('正在调用AI提取性状，请稍候...', 'loading');
+
+  try {
+    // 可编辑字段（排除taxon和虚拟尺寸基础字段）
+    const editableFields = FIELD_CONFIG.filter(f => !f.isTaxon && !f.isSizeBase);
+
+    // 需要在prompt中列出的字段：普通字段 + 尺寸基础字段 + 独立尺寸子字段（无对应基础字段的）
+    const promptFields = FIELD_CONFIG.filter(f => {
+      if (f.isTaxon) return false;
+      if (f.isSizeBase) return true;
+      if (f.sizeBase) {
+        const hasBase = FIELD_CONFIG.some(b => b.isSizeBase && b.key === f.sizeBase);
+        return !hasBase;
+      }
+      return true;
+    });
+
+    // 尺寸基础字段列表
+    const sizeBaseFields = promptFields.filter(f => f.isSizeBase);
+
+    // 动态生成字段描述
+    const fieldDescs = promptFields.map(f => {
+      if (f.isSizeBase) {
+        return `- "${f.key}"（${f.label}）: 尺寸字段，返回对象 {min, max, abs_min, abs_max}，单位统一为cm`;
+      }
+      let typeDesc = '字符串';
+      if (f.type === 'list') typeDesc = '字符串数组（多个值用数组，如["red","pink"]）';
+      else if (f.type === 'number') typeDesc = '数值（纯数字，不带单位）';
+      const descText = f.desc ? ` —— ${f.desc}` : '';
+      return `- "${f.key}"（${f.label}）: ${typeDesc}${descText}`;
+    }).join('\n');
+
+    const taxonField = FIELD_CONFIG.find(f => f.isTaxon);
+    const taxonInstruction = taxonField
+      ? `\n- "${taxonField.key}"（${taxonField.label}）: 物种的拉丁学名，字符串。如果文本中提到了学名就提取，没提到返回空字符串。`
+      : '';
+
+    const allKeys = promptFields.map(f => `"${f.key}"`);
+    if (taxonField) allKeys.unshift(`"${taxonField.key}"`);
+
+    // 尺寸字段提取规则
+    const sizeSection = sizeBaseFields.length > 0 ? `
+【尺寸字段提取规则（非常重要）】
+${sizeBaseFields.map(f => `- ${f.key}（${f.label}）`).join('\n')}
+每个尺寸字段返回对象，包含4个属性（单位均为cm，avg由系统自动计算，不需要返回）：
+- min: 典型范围的最小值（括号外的下限）
+- max: 典型范围的最大值（括号外的上限）
+- abs_min: 极端最小值（括号内的下限极值，如果没有括号则等于min）
+- abs_max: 极端最大值（括号内的上限极值，如果没有括号则等于max）
+尺寸解析示例：
+- "(2.5-)4-8(-10) cm" → {min:4, max:8, abs_min:2.5, abs_max:10}
+- "5-6 × 2.5-3 mm" → 前者长度min=0.5,max=0.6；后者宽度min=0.25,max=0.3（mm转cm除以10）
+- "长约5cm" → {min:5, max:5, abs_min:5, abs_max:5}
+- 文本中未提及的尺寸字段，返回 null
+` : '';
+
+    const systemPrompt = `你是一个专业的植物形态性状提取专家。请从用户提供的植物描述文本中，严格按照以下字段定义提取性状，以JSON格式返回。
+
+【需要提取的字段】
+${taxonInstruction}
+${fieldDescs}
+${sizeSection}
+【提取规则】
+1. 只提取文本中明确描述的性状，绝对不要推测、编造或补充文本中没有的信息。
+2. **必须返回原文中的原始用词，不要做标准化、翻译或归类**。例如原文写 "whitish" 就返回 "whitish"，不要改成 "white" 或 "白色"；原文写 "lanceolate to ovate" 就原样返回，不要拆分成标准词。标准化归类由后续步骤处理。
+3. 列表(list)类型：返回字符串数组；文本中未提及返回空数组 []。同一性状有多个描述值时全部列入，保持原文用词。
+4. 数值(number)类型：返回纯数字；未提及返回 null。
+5. 文本(string)类型：返回字符串；未提及返回空字符串 ""。
+6. 尺寸字段：返回对象 {min, max, abs_min, abs_max}，详见上面的尺寸字段提取规则。
+7. JSON的key必须严格使用上面列出的字段名（${allKeys.join('、')}），一字不差，包括大小写和下划线。
+8. 每个字段都必须出现在返回的JSON中，即使未提及也要返回对应空值。不要省略任何字段！
+9. 只返回JSON对象，不要任何解释文字、markdown标记或代码块包裹。
+
+【来源原文片段（重要，用于高亮核对）】
+请额外返回一个 "_sources" 对象，记录每个提取值对应的**原文片段**（从原文中复制的完整短语或句子），用于高亮核对：
+- 普通字段："原文中描述该性状的完整短语，如'花白色'"
+- 列表字段：["短语1", "短语2", ...] 每个值对应一个原文片段
+- 尺寸字段："完整的尺寸描述，如'叶长4-8cm'"
+- 未提取到的字段不需要出现在_sources中
+- 原文片段必须是原文中**实际存在的文字**，逐字复制，不要改写或翻译
+- 尽量包含足够的上下文（如'花白色'而不是只写'白色'），便于精确定位
+
+【返回示例】（假设只有3个字段）
+{"taxon": "Rosa chinensis", "叶形": ["ovate", "oblong"], "leaf_size_length": {"min": 2.5, "max": 6, "abs_min": 2, "abs_max": 8}, "_sources": {"taxon": "Rosa chinensis", "叶形": ["叶卵形至长圆形", "叶长圆形"], "leaf_size_length": "叶长2.5-6厘米"}}`;
+
+    const response = await fetch(`${settings.apiBase.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
+      body: JSON.stringify({
+        model: settings.apiModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.1,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`API请求失败 (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    let content = data.choices[0].message.content;
+    content = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    const extracted = JSON.parse(content);
+
+    // 模糊匹配字段名
+    function normalizeKey(s) {
+      return String(s).toLowerCase().replace(/[\s_\-]+/g, '').replace(/[^a-z0-9\u4e00-\u9fa5]/g, '');
+    }
+    const extractedNormMap = {};
+    Object.keys(extracted).forEach(k => { extractedNormMap[normalizeKey(k)] = k; });
+
+    function getExtractedVal(fieldName) {
+      if (extracted[fieldName] !== undefined) return extracted[fieldName];
+      const norm = normalizeKey(fieldName);
+      if (extractedNormMap[norm] !== undefined) return extracted[extractedNormMap[norm]];
+      return undefined;
+    }
+
+    // 提取来源原文片段
+    FIELD_SOURCES = {};
+    const sources = extracted._sources || {};
+    console.log('AI返回的_sources原始数据:', sources);
+
+    Object.keys(sources).forEach(key => {
+      if (key === '_sources') return;
+      const norm = normalizeKey(key);
+      // 找到对应的字段key
+      let targetKey = key;
+      for (const f of FIELD_CONFIG) {
+        if (normalizeKey(f.key) === norm) { targetKey = f.key; break; }
+      }
+      const src = sources[key];
+
+      // 容错处理：接受字符串、字符串数组、或包含text属性的对象
+      let phrases = [];
+      if (Array.isArray(src)) {
+        phrases = src.map(s => {
+          if (typeof s === 'string') return s.trim();
+          if (s && typeof s.text === 'string') return s.text.trim();
+          if (s && typeof s.phrase === 'string') return s.phrase.trim();
+          return null;
+        }).filter(s => s && s.length > 0);
+      } else if (typeof src === 'string' && src.trim().length > 0) {
+        phrases = [src.trim()];
+      } else if (src && typeof src === 'object') {
+        // 对象格式：尝试提取文本
+        if (typeof src.text === 'string') phrases = [src.text.trim()];
+        else if (typeof src.phrase === 'string') phrases = [src.phrase.trim()];
+        else if (typeof src.source === 'string') phrases = [src.source.trim()];
+        else if (typeof src.context === 'string') phrases = [src.context.trim()];
+      }
+
+      if (phrases.length > 0) {
+        FIELD_SOURCES[targetKey] = phrases;
+        console.log(`  来源 ${targetKey} (原key=${key}):`, phrases);
+      } else {
+        console.log(`  来源 ${targetKey} (原key=${key}): 格式无法解析 ->`, src);
+      }
+    });
+
+    // 尺寸字段特殊处理：如果基础字段有来源，子字段也共享
+    FIELD_CONFIG.forEach(f => {
+      if (f.sizeBase && FIELD_SOURCES[f.sizeBase] && !FIELD_SOURCES[f.key]) {
+        FIELD_SOURCES[f.key] = FIELD_SOURCES[f.sizeBase];
+        console.log(`  尺寸子字段 ${f.key} 继承基础字段 ${f.sizeBase} 的来源`);
+      }
+    });
+
+    console.log('最终来源原文片段:', Object.keys(FIELD_SOURCES).length, '个字段');
+
+    // 填充原始值
+    const rawValues = {};
+
+    // taxon
+    if (taxonField) {
+      const t = getExtractedVal(taxonField.key);
+      rawValues.taxon = (t && t !== '') ? String(t) : document.getElementById('taxonInput').value.trim();
+    } else {
+      rawValues.taxon = document.getElementById('taxonInput').value.trim();
+    }
+
+    // 性状字段
+    promptFields.forEach(f => {
+      // 尺寸基础字段：展开为5个子字段
+      if (f.isSizeBase) {
+        let obj = getExtractedVal(f.key);
+        // 兼容AI返回单个值或字符串的情况
+        if (obj !== null && obj !== undefined && typeof obj !== 'object') {
+          const num = parseFloat(obj);
+          if (!isNaN(num)) obj = { min: num, max: num, abs_min: num, abs_max: num };
+        }
+        if (obj && typeof obj === 'object') {
+          SIZE_SUFFIXES.forEach(ss => {
+            if (ss.suffix === '_avg') return; // avg自动算
+            const subKey = f.key + ss.suffix;
+            const propName = ss.suffix.slice(1); // 去掉下划线
+            if (obj[propName] !== null && obj[propName] !== undefined) {
+              rawValues[subKey] = String(obj[propName]);
+            }
+          });
+        }
+        return;
+      }
+
+      // 普通字段和独立尺寸子字段
+      let val = getExtractedVal(f.key);
+      if (val === null || val === undefined) {
+        rawValues[f.key] = '';
+      } else if (f.type === 'list') {
+        if (Array.isArray(val)) rawValues[f.key] = val.join(', ');
+        else if (typeof val === 'string') rawValues[f.key] = val;
+        else rawValues[f.key] = String(val);
+      } else if (f.type === 'number') {
+        if (Array.isArray(val)) rawValues[f.key] = val.join('-');
+        else rawValues[f.key] = String(val);
+      } else {
+        rawValues[f.key] = String(val);
+      }
+    });
+
+    // 先填入原始值（setFieldValues会自动计算avg）
+    setFieldValues(rawValues);
+
+    // 检查是否有字段需要标准化（排除尺寸字段）
+    const fieldsToStandardize = editableFields.filter(f =>
+      !f.sizeBase && f.standardExamples && f.standardExamples.length > 0 && rawValues[f.key]
+    );
+
+    if (fieldsToStandardize.length === 0) {
+      const filledCount = Object.values(rawValues).filter(v => v && v !== '').length;
+      showStatus(`✅ 提取完成！已填充 ${filledCount} 个字段，请核对后添加到记录。`, 'success');
+      // 自动模式：无映射需要标准化，直接继续
+      if (autoExtractRunning) {
+        setTimeout(() => { autoExtractAfterExtract(); }, 300);
+      }
+      return;
+    }
+
+    // 构建映射表
+    showStatus('正在标准化性状描述...', 'loading');
+    const mappings = await buildMappings(fieldsToStandardize, rawValues);
+
+    if (mappings.length === 0) {
+      const filledCount = Object.values(rawValues).filter(v => v && v !== '').length;
+      showStatus(`✅ 提取完成！已填充 ${filledCount} 个字段。`, 'success');
+      // 自动模式：无映射结果，直接继续
+      if (autoExtractRunning) {
+        setTimeout(() => { autoExtractAfterExtract(); }, 300);
+      }
+      return;
+    }
+
+    PENDING_MAPPINGS = mappings;
+
+    // 自动批量提取模式
+    if (autoExtractRunning) {
+      if (autoExtractMode === 'full') {
+        // 全自动：直接应用映射，不弹确认框
+        console.log('全自动模式：自动应用映射，不弹确认框');
+        applyMapping();
+        return;
+      } else {
+        // 半自动：弹映射表，用户确认后继续
+        console.log('半自动模式：弹出映射表等待确认');
+        showMappingModal(mappings);
+        return;
+      }
+    }
+
+    showMappingModal(mappings);
+
+  } catch (error) {
+    console.error('提取失败:', error);
+    showStatus('提取失败: ' + error.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🤖 AI提取性状';
+  }
+}
+
+// ==================== 标准化映射 ====================
+// 归一化值（用于匹配时忽略空格、大小写、标点差异）
+function normalizeValue(v) {
+  return String(v).trim().toLowerCase().replace(/[\s\u3000]+/g, ' ').replace(/[，、；;]/g, ',');
+}
+
+// 从缓存中查找映射（支持归一化匹配）
+function lookupCache(fieldCache, origVal) {
+  if (!fieldCache) return undefined;
+  // 先精确匹配
+  if (fieldCache[origVal] !== undefined) return fieldCache[origVal];
+  // 再归一化匹配
+  const norm = normalizeValue(origVal);
+  for (const key in fieldCache) {
+    if (normalizeValue(key) === norm) return fieldCache[key];
+  }
+  return undefined;
+}
+
+// 构建映射表：查缓存 + 本地预匹配 + AI并行映射未命中的
+async function buildMappings(fields, rawValues) {
+  const mappings = [];
+  const needAI = []; // 需要AI映射的 {field, originalValues}
+
+  fields.forEach(f => {
+    const raw = rawValues[f.key];
+    if (!raw) return;
+    // 拆分列表类型的多个值（支持多种分隔符）
+    const values = f.type === 'list' ? raw.split(/[,，、;；]/).map(s => s.trim()).filter(s => s) : [raw];
+    const fieldCache = MAPPING_CACHE[f.key] || {};
+    const examples = f.standardExamples || [];
+
+    values.forEach(origVal => {
+      // 1. 缓存命中（支持归一化匹配）
+      const cached = lookupCache(fieldCache, origVal);
+      if (cached !== undefined) {
+        if (cached === '__IGNORE__') {
+          mappings.push({
+            fieldKey: f.key, fieldLabel: f.label,
+            original: origVal, standard: '__IGNORE__',
+            confidence: '缓存(忽略)', fromCache: true, ignored: true
+          });
+        } else {
+          mappings.push({
+            fieldKey: f.key, fieldLabel: f.label,
+            original: origVal, standard: cached,
+            confidence: '缓存', fromCache: true
+          });
+        }
+        return;
+      }
+
+      // 2. 本地预匹配：原始值已在标准词列表中（忽略大小写和空格）
+      const normOrig = origVal.toLowerCase().trim();
+      const exactMatch = examples.find(ex => ex.toLowerCase().trim() === normOrig);
+      if (exactMatch) {
+        mappings.push({
+          fieldKey: f.key, fieldLabel: f.label,
+          original: origVal, standard: exactMatch,
+          confidence: '本地匹配', fromCache: false, localMatch: true
+        });
+        // 存入缓存，下次直接命中
+        if (!MAPPING_CACHE[f.key]) MAPPING_CACHE[f.key] = {};
+        MAPPING_CACHE[f.key][origVal] = exactMatch;
+        return;
+      }
+
+      // 3. 未命中，需要AI
+      const existing = needAI.find(x => x.fieldKey === f.key);
+      if (existing) existing.values.push(origVal);
+      else needAI.push({ fieldKey: f.key, fieldLabel: f.label, examples: f.standardExamples, values: [origVal] });
+    });
+  });
+
+  console.log(`标准化映射：缓存+本地匹配 ${mappings.length} 个，需AI处理 ${needAI.length} 个字段`);
+
+  // 4. 并行调用AI映射未命中的（限制最多5个并发）
+  if (needAI.length > 0) {
+    const MAX_CONCURRENT = 5;
+    const aiResults = new Array(needAI.length);
+
+    async function processBatch(startIdx) {
+      const batch = needAI.slice(startIdx, startIdx + MAX_CONCURRENT);
+      const batchResults = await Promise.all(batch.map(async (item, i) => {
+        try {
+          return await callAIForMapping(item);
+        } catch(e) {
+          console.error('AI映射失败:', item.fieldKey, e);
+          // AI失败时，原始值保持不变
+          return item.values.map(v => ({
+            original: v, standard: v, confidence: '映射失败'
+          }));
+        }
+      }));
+      batchResults.forEach((r, i) => {
+        aiResults[startIdx + i] = r;
+      });
+    }
+
+    for (let i = 0; i < needAI.length; i += MAX_CONCURRENT) {
+      await processBatch(i);
+    }
+
+    aiResults.forEach((results, idx) => {
+      const item = needAI[idx];
+      results.forEach(r => {
+        mappings.push({
+          fieldKey: item.fieldKey,
+          fieldLabel: item.fieldLabel,
+          original: r.original,
+          standard: r.standard,
+          confidence: r.confidence,
+          fromCache: false
+        });
+      });
+    });
+  }
+
+  return mappings;
+}
+
+// 调用AI做映射
+async function callAIForMapping(item) {
+  const settings = getSettings();
+  const prompt = `你是一个植物性状标准化专家。请将以下原始描述归类到最接近的标准词中。
+
+【性状】${item.fieldLabel}
+【标准词列表】${item.examples.join('、')}
+【待归类的原始描述】${item.values.join('、')}
+
+请返回JSON，格式为 {"mappings": [{"original": "原始词", "standard": "标准词", "confidence": "高/中/低"}]}
+规则：
+1. standard必须是标准词列表中的一个，一字不差。
+2. 如果原始词与任何标准词都不匹配，standard设为"其他"，confidence设为"低"。
+3. confidence表示匹配置信度：高=完全同义，中=近义/相关，低=勉强相关或不匹配。
+4. 只返回JSON，不要其他文字。`;
+
+  const response = await fetch(`${settings.apiBase.replace(/\/$/, '')}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
+    body: JSON.stringify({
+      model: settings.apiModel,
+      messages: [
+        { role: 'system', content: '你是一个植物性状标准化专家，只返回JSON。' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.1,
+      response_format: { type: 'json_object' }
+    })
+  });
+
+  if (!response.ok) throw new Error('映射API失败 ' + response.status);
+
+  const data = await response.json();
+  let content = data.choices[0].message.content;
+  content = content.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  const result = JSON.parse(content);
+  return result.mappings || [];
+}
+
+// 显示映射表模态框
+function showMappingModal(mappings) {
+  const container = document.getElementById('mappingContent');
+  // 按字段分组
+  const byField = {};
+  mappings.forEach(m => {
+    if (!byField[m.fieldKey]) byField[m.fieldKey] = { label: m.fieldLabel, items: [] };
+    byField[m.fieldKey].items.push(m);
+  });
+
+  let html = '';
+  html += '<div style="margin-bottom:12px;padding:8px 12px;background:#fff8e1;border-radius:4px;font-size:12px;color:#795548;">';
+  html += '💡 提示：下拉可选标准词、「自定义...」输入任意值、或「🚫 忽略此值」丢弃该描述。列表字段可在自定义中用逗号分隔输入多个值。';
+  html += '</div>';
+
+  Object.keys(byField).forEach(fieldKey => {
+    const group = byField[fieldKey];
+    const field = FIELD_CONFIG.find(f => f.key === fieldKey);
+    const examples = field ? field.standardExamples : [];
+    const isList = field && field.type === 'list';
+
+    html += `<div style="margin-bottom:16px;">
+      <div style="font-weight:600;font-size:13px;color:#1b4332;margin-bottom:6px;padding:4px 8px;background:#e8f5ee;border-radius:4px;">
+        ${escapeHtml(group.label)} <span style="font-weight:normal;color:#888;font-size:11px;">标准词: ${examples.join('、')}${isList ? '（列表字段，支持多值）' : ''}</span>
+      </div>
+      <table class="field-config-table" style="font-size:12px;">
+        <thead><tr><th style="width:30%">原始描述</th><th style="width:40%">归类为</th><th style="width:15%">置信度</th><th style="width:15%">来源</th></tr></thead>
+        <tbody>`;
+
+    group.items.forEach((m, idx) => {
+      const isIgnored = m.standard === '__IGNORE__' || m.ignored;
+      const isCustom = m.standard !== '__IGNORE__' && !examples.includes(m.standard) && m.standard !== '其他';
+      const confColor = isIgnored ? '#999' : (m.confidence === '高' ? '#27ae60' : m.confidence === '中' ? '#f39c12' : m.confidence === '缓存' || m.confidence === '本地匹配' ? '#2980b9' : '#e74c3c');
+
+      // 构建下拉选项
+      let options = examples.map(e => `<option value="${escapeHtml(e)}" ${e === m.standard ? 'selected' : ''}>${escapeHtml(e)}</option>`).join('');
+      options += `<option value="__CUSTOM__" ${isCustom ? 'selected' : ''}>✏️ 自定义...</option>`;
+      options += `<option value="其他" ${m.standard === '其他' ? 'selected' : ''}>其他（保留原值）</option>`;
+      options += `<option value="__IGNORE__" ${isIgnored ? 'selected' : ''}>🚫 忽略此值</option>`;
+
+      const rowId = `maprow_${fieldKey}_${idx}`;
+      const customInputId = `custom_${fieldKey}_${idx}`;
+
+      html += `<tr id="${rowId}" style="${isIgnored ? 'opacity:0.5;text-decoration:line-through;' : ''}">
+        <td>${escapeHtml(m.original)}</td>
+        <td>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <select style="flex:1;" onchange="onMappingSelectChange(this, '${fieldKey}', '${m.original.replace(/'/g, "\\'")}', '${customInputId}')">
+              ${options}
+            </select>
+            <input type="text" id="${customInputId}" placeholder="输入自定义值${isList ? '，逗号分隔多个' : ''}"
+              style="display:${isCustom ? 'inline-block' : 'none'};width:120px;padding:2px 4px;font-size:11px;border:1px solid #ccc;border-radius:3px;"
+              value="${isCustom ? escapeHtml(m.standard) : ''}"
+              onchange="onMappingCustomInput(this, '${fieldKey}', '${m.original.replace(/'/g, "\\'")}')">
+          </div>
+        </td>
+        <td style="color:${confColor};font-weight:600;">${isIgnored ? '已忽略' : escapeHtml(m.confidence)}</td>
+        <td style="color:#999;">${m.fromCache ? '缓存' : (m.localMatch ? '本地' : 'AI')}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+  });
+
+  container.innerHTML = html;
+  document.getElementById('mappingModal').classList.add('active');
+  showStatus('请检查标准化映射表，确认后应用', 'info');
+}
+
+// 映射表下拉选择变化
+function onMappingSelectChange(selectEl, fieldKey, original, customInputId) {
+  const m = PENDING_MAPPINGS.find(x => x.fieldKey === fieldKey && x.original === original);
+  if (!m) return;
+
+  const customInput = document.getElementById(customInputId);
+  const row = selectEl.closest('tr');
+
+  if (selectEl.value === '__CUSTOM__') {
+    // 自定义：显示输入框
+    customInput.style.display = 'inline-block';
+    customInput.focus();
+    m.standard = customInput.value || original;
+    m.ignored = false;
+    row.style.opacity = '1';
+    row.style.textDecoration = 'none';
+  } else if (selectEl.value === '__IGNORE__') {
+    // 忽略：隐藏输入框，标记忽略
+    customInput.style.display = 'none';
+    m.standard = '__IGNORE__';
+    m.ignored = true;
+    row.style.opacity = '0.5';
+    row.style.textDecoration = 'line-through';
+  } else {
+    // 标准词或其他
+    customInput.style.display = 'none';
+    m.standard = selectEl.value;
+    m.ignored = false;
+    row.style.opacity = '1';
+    row.style.textDecoration = 'none';
+  }
+}
+
+// 映射表自定义输入变化
+function onMappingCustomInput(inputEl, fieldKey, original) {
+  const m = PENDING_MAPPINGS.find(x => x.fieldKey === fieldKey && x.original === original);
+  if (!m) return;
+  m.standard = inputEl.value.trim() || original;
+}
+
+// 应用映射
+function applyMapping() {
+  // 按字段分组处理
+  const byField = {};
+  PENDING_MAPPINGS.forEach(m => {
+    if (!byField[m.fieldKey]) byField[m.fieldKey] = [];
+    byField[m.fieldKey].push(m);
+  });
+
+  let ignoredCount = 0;
+
+  Object.keys(byField).forEach(fieldKey => {
+    const field = FIELD_CONFIG.find(f => f.key === fieldKey);
+    if (!field) return;
+    const el = document.getElementById(fieldDomId(fieldKey));
+    if (!el) return;
+
+    const mappings = byField[fieldKey];
+    const isList = field.type === 'list';
+
+    // 保存到缓存（包括忽略状态）
+    if (!MAPPING_CACHE[fieldKey]) MAPPING_CACHE[fieldKey] = {};
+    mappings.forEach(m => {
+      MAPPING_CACHE[fieldKey][m.original] = m.standard;
+    });
+
+    if (isList) {
+      // 列表类型：用映射表重建整个值（归一化匹配，忽略空格/大小写差异）
+      const valueMap = {}; // 用归一化后的键
+      mappings.forEach(m => {
+        const key = normalizeValue(m.original);
+        if (m.ignored || m.standard === '__IGNORE__') {
+          valueMap[key] = null; // null表示移除
+          ignoredCount++;
+        } else {
+          valueMap[key] = m.standard === '其他' ? m.original : m.standard;
+        }
+      });
+
+      console.log(`列表字段 ${fieldKey} 映射:`, valueMap, '原值:', el.value);
+
+      // 重建字段值
+      const currentValues = el.value.split(/[,，、;；]/).map(s => s.trim()).filter(s => s);
+      const newValues = [];
+      currentValues.forEach(v => {
+        const key = normalizeValue(v);
+        if (valueMap[key] !== undefined) {
+          if (valueMap[key] !== null) {
+            // 标准值可能包含多个逗号分隔的值
+            String(valueMap[key]).split(/[,，、;；]/).map(s => s.trim()).filter(s => s).forEach(sv => {
+              if (!newValues.includes(sv)) newValues.push(sv);
+            });
+          }
+          // null表示忽略，不添加
+        } else {
+          // 没有映射的原值保留
+          if (!newValues.includes(v)) newValues.push(v);
+        }
+      });
+      el.value = newValues.join(', ');
+      console.log(`列表字段 ${fieldKey} 新值:`, el.value);
+    } else {
+      // 非列表类型：取第一个非忽略的映射
+      const activeMapping = mappings.find(m => !m.ignored && m.standard !== '__IGNORE__');
+      if (activeMapping) {
+        const newVal = activeMapping.standard === '其他' ? activeMapping.original : activeMapping.standard;
+        console.log(`非列表字段 ${fieldKey}: ${activeMapping.original} -> ${newVal}`);
+        el.value = newVal;
+      } else {
+        // 全部被忽略，清空该字段
+        el.value = '';
+        ignoredCount += mappings.length;
+      }
+    }
+  });
+
+  saveMappingCache();
+  updateFieldFillCount();
+  document.getElementById('mappingModal').classList.remove('active');
+  PENDING_MAPPINGS = [];
+  const msg = ignoredCount > 0 ? `✅ 标准化已应用（忽略 ${ignoredCount} 个值），映射表已缓存` : '✅ 标准化已应用，映射表已缓存';
+  showStatus(msg, 'success');
+
+  // 自动批量提取模式：映射应用后自动添加记录并处理下一个
+  if (autoExtractRunning) {
+    console.log('自动模式：映射已应用，准备添加记录并继续');
+    setTimeout(() => { autoExtractAfterMapping(); }, 300);
+  }
+}
+
+// 跳过映射，保留原始值
+function skipMapping() {
+  document.getElementById('mappingModal').classList.remove('active');
+  PENDING_MAPPINGS = [];
+  showStatus('已跳过标准化，保留原始值', 'info');
+}
+
+// 导出当前映射表为CSV
+function exportMappingTable() {
+  if (PENDING_MAPPINGS.length === 0) {
+    showStatus('没有可导出的映射表', 'error');
+    return;
+  }
+  let csv = 'trait,original,standard,confidence,source,status\n';
+  PENDING_MAPPINGS.forEach(m => {
+    const status = m.ignored || m.standard === '__IGNORE__' ? '忽略' : (m.standard === '其他' ? '保留原值' : (m.localMatch ? '本地匹配' : '标准化'));
+    const standardDisplay = m.ignored || m.standard === '__IGNORE__' ? '(忽略)' : m.standard;
+    csv += `"${m.fieldLabel}","${m.original}","${standardDisplay}","${m.confidence}","${m.fromCache ? '缓存' : (m.localMatch ? '本地' : 'AI')}","${status}"\n`;
+  });
+  const blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const now = new Date();
+  a.download = `AI归类映射表_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showStatus(`✅ 已导出 ${PENDING_MAPPINGS.length} 条映射关系`, 'success');
+}
+
+// 清除映射缓存
+function clearMappingCache() {
+  if (!confirm('确定清除所有AI归类缓存吗？\n\n这将清除「原始词→标准词」的缓存映射关系，下次提取时需要重新AI归类。\n注意：不会清除你设置的标准词。')) return;
+  MAPPING_CACHE = {};
+  saveMappingCache();
+  showStatus('AI归类缓存已清除（标准词设置保留）', 'success');
+}
+
+// 清除所有字段的标准词设置
+function clearAllStandardExamples() {
+  if (!confirm('确定清除所有字段的标准词设置吗？\n\n这将清空所有字段的标准词，AI提取时不再自动归类。\n注意：不会清除AI归类缓存。')) return;
+  FIELD_CONFIG.forEach(f => {
+    if (f.standardExamples) f.standardExamples = [];
+  });
+  saveFieldConfigToStorage();
+  openFieldConfig(); // 重新渲染表格
+  showStatus('所有标准词已清除（AI归类缓存保留）', 'success');
+}
+
+// ==================== 映射管理 ====================
+function openMappingManager() {
+  // 填充字段筛选下拉
+  const filter = document.getElementById('mappingManagerFilter');
+  const currentVal = filter.value;
+  let options = '<option value="">全部字段</option>';
+  FIELD_CONFIG.forEach(f => {
+    if (!f.isTaxon && !f.isSizeBase && f.standardExamples && f.standardExamples.length > 0) {
+      const count = MAPPING_CACHE[f.key] ? Object.keys(MAPPING_CACHE[f.key]).length : 0;
+      options += `<option value="${f.key}" ${f.key === currentVal ? 'selected' : ''}>${escapeHtml(f.label)} (${count})</option>`;
+    }
+  });
+  filter.innerHTML = options;
+
+  renderMappingManager();
+  document.getElementById('mappingManagerModal').classList.add('active');
+}
+
+function closeMappingManager() {
+  document.getElementById('mappingManagerModal').classList.remove('active');
+}
+
+function renderMappingManager() {
+  const container = document.getElementById('mappingManagerContent');
+  const filterField = document.getElementById('mappingManagerFilter').value;
+  const search = document.getElementById('mappingManagerSearch').value.toLowerCase().trim();
+
+  let totalCount = 0;
+  let html = '';
+
+  FIELD_CONFIG.forEach(f => {
+    if (f.isTaxon || f.isSizeBase) return;
+    if (!f.standardExamples || f.standardExamples.length === 0) return;
+    if (filterField && f.key !== filterField) return;
+
+    const fieldCache = MAPPING_CACHE[f.key] || {};
+    const entries = Object.entries(fieldCache);
+    if (entries.length === 0) return;
+
+    // 搜索过滤
+    const filtered = search ? entries.filter(([orig, std]) =>
+      orig.toLowerCase().includes(search) || (std && std.toLowerCase().includes(search))
+    ) : entries;
+
+    if (filtered.length === 0) return;
+    totalCount += filtered.length;
+
+    html += `<div style="margin-bottom:16px;">
+      <div style="font-weight:600;font-size:13px;color:#1b4332;margin-bottom:6px;padding:4px 8px;background:#e8f5ee;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">
+        <span>${escapeHtml(f.label)} <span style="font-weight:normal;color:#888;font-size:11px;">标准词: ${f.standardExamples.join('、')}</span></span>
+        <button class="btn btn-danger btn-sm" onclick="clearFieldMappings('${f.key}')" style="font-size:11px;padding:2px 8px;">清空此字段</button>
+      </div>
+      <table class="field-config-table" style="font-size:12px;">
+        <thead><tr><th style="width:30%">原始词</th><th style="width:35%">归类为</th><th style="width:20%">状态</th><th style="width:15%">操作</th></tr></thead>
+        <tbody>`;
+
+    filtered.forEach(([orig, std]) => {
+      const isIgnored = std === '__IGNORE__';
+      const isOther = std === '其他';
+      const isCustom = !isIgnored && !isOther && !f.standardExamples.includes(std);
+
+      let options = f.standardExamples.map(e =>
+        `<option value="${escapeHtml(e)}" ${e === std ? 'selected' : ''}>${escapeHtml(e)}</option>`
+      ).join('');
+      options += `<option value="__CUSTOM__" ${isCustom ? 'selected' : ''}>✏️ 自定义...</option>`;
+      options += `<option value="其他" ${isOther ? 'selected' : ''}>其他（保留原值）</option>`;
+      options += `<option value="__IGNORE__" ${isIgnored ? 'selected' : ''}>🚫 忽略此值</option>`;
+
+      const customId = `mgmt_custom_${f.key}_${orig.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const statusText = isIgnored ? '已忽略' : (isCustom ? '自定义' : (isOther ? '保留原值' : '标准词'));
+      const statusColor = isIgnored ? '#999' : (isCustom ? '#f39c12' : '#27ae60');
+
+      html += `<tr style="${isIgnored ? 'opacity:0.5;text-decoration:line-through;' : ''}">
+        <td>${escapeHtml(orig)}</td>
+        <td>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <select style="flex:1;" onchange="updateMappingFromManager('${f.key}', '${orig.replace(/'/g, "\\'")}', this.value, '${customId}')">
+              ${options}
+            </select>
+            <input type="text" id="${customId}" placeholder="自定义值"
+              style="display:${isCustom ? 'inline-block' : 'none'};width:100px;padding:2px 4px;font-size:11px;border:1px solid #ccc;border-radius:3px;"
+              value="${isCustom ? escapeHtml(std) : ''}"
+              onchange="updateCustomMapping('${f.key}', '${orig.replace(/'/g, "\\'")}', this.value)">
+          </div>
+        </td>
+        <td style="color:${statusColor};font-weight:600;">${statusText}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteMapping('${f.key}', '${orig.replace(/'/g, "\\'")}')">删除</button></td>
+      </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+  });
+
+  if (totalCount === 0) {
+    html = '<div style="text-align:center;padding:40px;color:#999;">没有找到映射关系。提取性状并确认映射后，这里会显示缓存的映射。</div>';
+  }
+
+  container.innerHTML = html;
+  document.getElementById('mappingManagerStats').textContent = `共 ${totalCount} 条映射`;
+}
+
+function updateMappingFromManager(fieldKey, original, newVal, customInputId) {
+  if (newVal === '__CUSTOM__') {
+    document.getElementById(customInputId).style.display = 'inline-block';
+    document.getElementById(customInputId).focus();
+    return;
+  }
+  document.getElementById(customInputId).style.display = 'none';
+  if (!MAPPING_CACHE[fieldKey]) MAPPING_CACHE[fieldKey] = {};
+  MAPPING_CACHE[fieldKey][original] = newVal;
+  saveMappingCache();
+  renderMappingManager();
+  showStatus(`已更新映射：${original} → ${newVal === '__IGNORE__' ? '忽略' : newVal}`, 'success');
+}
+
+function updateCustomMapping(fieldKey, original, customVal) {
+  const val = customVal.trim() || original;
+  if (!MAPPING_CACHE[fieldKey]) MAPPING_CACHE[fieldKey] = {};
+  MAPPING_CACHE[fieldKey][original] = val;
+  saveMappingCache();
+  showStatus(`已更新自定义映射：${original} → ${val}`, 'success');
+}
+
+function deleteMapping(fieldKey, original) {
+  if (!confirm(`确定删除映射「${original}」吗？\n\n删除后下次提取遇到该词会重新AI归类。`)) return;
+  if (MAPPING_CACHE[fieldKey]) {
+    delete MAPPING_CACHE[fieldKey][original];
+    saveMappingCache();
+  }
+  renderMappingManager();
+  showStatus(`已删除映射：${original}`, 'info');
+}
+
+function clearFieldMappings(fieldKey) {
+  const field = FIELD_CONFIG.find(f => f.key === fieldKey);
+  if (!field) return;
+  if (!confirm(`确定清空「${field.label}」的所有映射吗？`)) return;
+  if (MAPPING_CACHE[fieldKey]) {
+    delete MAPPING_CACHE[fieldKey];
+    saveMappingCache();
+  }
+  renderMappingManager();
+  showStatus(`已清空「${field.label}」的所有映射`, 'info');
+}
+
+function exportAllMappings() {
+  let csv = 'trait,original,standard,status\n';
+  let count = 0;
+  FIELD_CONFIG.forEach(f => {
+    if (f.isTaxon || f.isSizeBase) return;
+    const fieldCache = MAPPING_CACHE[f.key] || {};
+    Object.entries(fieldCache).forEach(([orig, std]) => {
+      const status = std === '__IGNORE__' ? '忽略' : (std === '其他' ? '保留原值' : (f.standardExamples.includes(std) ? '标准词' : '自定义'));
+      csv += `"${f.label}","${orig}","${std === '__IGNORE__' ? '(忽略)' : std}","${status}"\n`;
+      count++;
+    });
+  });
+  if (count === 0) {
+    showStatus('没有可导出的映射', 'error');
+    return;
+  }
+  const blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const now = new Date();
+  a.download = `全部映射表_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showStatus(`✅ 已导出 ${count} 条映射`, 'success');
+}
+
+function handleMappingManagerImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const buffer = e.target.result;
+      const text = decodeTextBuffer(buffer);
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) {
+        showStatus('CSV文件为空或格式错误', 'error');
+        return;
+      }
+      // 解析表头
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+      const traitIdx = headers.findIndex(h => ['trait', 'field', '字段', '性状'].includes(h));
+      const origIdx = headers.findIndex(h => ['original', '原始词', '原始值', '原值'].includes(h));
+      const stdIdx = headers.findIndex(h => ['standard', '标准词', '标准值', '归类'].includes(h));
+
+      if (origIdx < 0 || stdIdx < 0) {
+        showStatus('CSV需要包含 original 和 standard 列', 'error');
+        return;
+      }
+
+      let imported = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].match(/("([^"]|"")*"|[^,]+)/g) || [];
+        const values = parts.map(p => p.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+        const orig = values[origIdx] ? values[origIdx].trim() : '';
+        let std = values[stdIdx] ? values[stdIdx].trim() : '';
+        if (!orig || !std) continue;
+
+        // 处理忽略标记
+        if (std === '(忽略)' || std === '__IGNORE__' || std === '忽略') std = '__IGNORE__';
+
+        // 找到对应的字段key
+        let fieldKey = null;
+        if (traitIdx >= 0 && values[traitIdx]) {
+          const traitName = values[traitIdx].trim();
+          const field = FIELD_CONFIG.find(f => f.label === traitName || f.key === traitName || f.originalName === traitName);
+          if (field) fieldKey = field.key;
+        }
+        if (!fieldKey) {
+          // 如果没有字段名列，尝试导入到第一个有标准词的字段
+          const firstField = FIELD_CONFIG.find(f => !f.isTaxon && !f.isSizeBase && f.standardExamples && f.standardExamples.length > 0);
+          if (firstField) fieldKey = firstField.key;
+        }
+        if (!fieldKey) continue;
+
+        if (!MAPPING_CACHE[fieldKey]) MAPPING_CACHE[fieldKey] = {};
+        MAPPING_CACHE[fieldKey][orig] = std;
+        imported++;
+      }
+
+      saveMappingCache();
+      renderMappingManager();
+      showStatus(`✅ 已导入 ${imported} 条映射`, 'success');
+    } catch(err) {
+      showStatus('导入失败: ' + err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
+}
+
+// ==================== 批量处理TXT ====================
+async function handleBatchImport(event) {
+  const files = event.target.files;
+  if (!files || files.length === 0) {
+    showStatus('未选择文件', 'error');
+    event.target.value = '';
+    return;
+  }
+
+  showStatus(`正在读取 ${files.length} 个文件...`, 'loading');
+  console.log('开始导入文件:', files.length, '个');
+
+  try {
+    // 用Promise.all并行读取所有文件，确保全部完成后才继续
+    const results = await Promise.all(
+      Array.from(files).map(file => readSpeciesFile(file))
+    );
+
+    const newSpecies = results.filter(r => r.success).map(r => r.data);
+    const failed = results.filter(r => !r.success).length;
+    const emptyCount = newSpecies.filter(s => !s.content || s.content.length === 0).length;
+
+    console.log('读取完成:', newSpecies.length, '成功,', failed, '失败,', emptyCount, '空内容');
+    newSpecies.forEach(s => console.log(`  - ${s.name}: ${s.content.length} 字符`));
+
+    if (newSpecies.length === 0) {
+      showStatus(`❌ 所有 ${files.length} 个文件读取失败，请按F12查看控制台`, 'error');
+      event.target.value = '';
+      return;
+    }
+
+    if (emptyCount === newSpecies.length) {
+      showStatus(`⚠️ 所有文件内容为空，可能是编码问题。请检查文件是否为纯文本格式`, 'error');
+    }
+
+    speciesQueue = speciesQueue.concat(newSpecies);
+    speciesQueue.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+
+    // 显示批量处理区域
+    const batchSection = document.getElementById('batchSection');
+    if (batchSection) {
+      batchSection.style.display = 'block';
+    }
+
+    // 加载第一个物种
+    if (currentSpeciesIndex < 0 && speciesQueue.length > 0) {
+      loadSpecies(0);
+    } else {
+      renderBatchList();
+    }
+
+    let msg = `✅ 已导入 ${newSpecies.length} 个物种，队列共 ${speciesQueue.length} 个`;
+    if (failed > 0) msg += `（${failed} 个失败）`;
+    showStatus(msg, 'success');
+  } catch (err) {
+    console.error('批量导入异常:', err);
+    showStatus('批量导入失败: ' + err.message, 'error');
+  }
+
+  event.target.value = '';
+}
+
+// 读取单个物种文件（Promise包装，确保总是resolve）
+function readSpeciesFile(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+      try {
+        let content = e.target ? e.target.result : '';
+        console.log('readAsText结果:', file.name, typeof content, content ? content.length : 0, '字符');
+
+        // 如果内容为空或有大量替换字符，尝试用ArrayBuffer+TextDecoder重新解码
+        if (!content || content.length === 0 || (content.match(/\uFFFD/g) || []).length > content.length * 0.1) {
+          console.log('readAsText结果异常，尝试ArrayBuffer方式:', file.name);
+          const reader2 = new FileReader();
+          reader2.onload = function(e2) {
+            try {
+              const buffer = e2.target ? e2.target.result : null;
+              if (buffer) {
+                content = decodeTextBuffer(buffer);
+              }
+              const name = file.name.replace(/\.(txt|text)$/i, '');
+              console.log('最终读取:', file.name, content.length, '字符');
+              resolve({
+                success: true,
+                data: { name: name, content: content, status: 'pending' }
+              });
+            } catch (err) {
+              console.error('二次解码失败:', file.name, err);
+              resolve({ success: false });
+            }
+          };
+          reader2.onerror = function() { resolve({ success: false }); };
+          reader2.readAsArrayBuffer(file);
+          return;
+        }
+
+        const name = file.name.replace(/\.(txt|text)$/i, '');
+        resolve({
+          success: true,
+          data: { name: name, content: content, status: 'pending' }
+        });
+      } catch (err) {
+        console.error('读取失败:', file.name, err);
+        resolve({ success: false });
+      }
+    };
+
+    reader.onerror = function() {
+      console.error('读取错误:', file.name, reader.error);
+      resolve({ success: false });
+    };
+
+    reader.onabort = function() {
+      console.error('读取中断:', file.name);
+      resolve({ success: false });
+    };
+
+    // 优先用readAsText，浏览器自动检测编码
+    reader.readAsText(file);
+  });
+}
+
+// 自动检测编码并解码文本
+function decodeTextBuffer(buffer) {
+  if (!buffer) return '';
+
+  // 检查UTF-8 BOM
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+    try {
+      const decoder = new TextDecoder('utf-8');
+      return decoder.decode(buffer);
+    } catch (e) {}
+  }
+
+  // 1. 优先尝试UTF-8
+  try {
+    const decoder = new TextDecoder('utf-8');
+    const result = decoder.decode(buffer);
+    const replacementCount = (result.match(/\uFFFD/g) || []).length;
+    if (result && replacementCount < result.length * 0.1) {
+      return result;
+    }
+  } catch (e) {}
+
+  // 2. 尝试GBK
+  try {
+    const decoder = new TextDecoder('gbk');
+    const result = decoder.decode(buffer);
+    if (result) return result;
+  } catch (e) {}
+
+  // 3. 尝试GB18030（中文标准编码，兼容GBK）
+  try {
+    const decoder = new TextDecoder('gb18030');
+    const result = decoder.decode(buffer);
+    if (result) return result;
+  } catch (e) {}
+
+  // 4. 兜底
+  try {
+    const result = new TextDecoder().decode(buffer);
+    return result || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+// 渲染批量处理列表
+function renderBatchList() {
+  const container = document.getElementById('batchList');
+  if (!container) return;
+
+  document.getElementById('batchProgress').textContent = `${currentSpeciesIndex + 1} / ${speciesQueue.length}`;
+
+  let html = '';
+  speciesQueue.forEach((sp, idx) => {
+    const statusClass = sp.status;
+    const isActive = idx === currentSpeciesIndex ? 'active' : '';
+    html += `<div class="batch-item ${statusClass} ${isActive}" onclick="loadSpecies(${idx})">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${idx + 1}. ${escapeHtml(sp.name)}</span>
+      <span class="batch-status">${sp.status === 'done' ? '已完成' : sp.status === 'active' ? '处理中' : '待处理'}</span>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function loadSpecies(index) {
+  if (index < 0 || index >= speciesQueue.length) return;
+
+  // 先保存当前物种的字段值和sources（如果有当前物种）
+  if (currentSpeciesIndex >= 0 && currentSpeciesIndex < speciesQueue.length) {
+    const currentSp = speciesQueue[currentSpeciesIndex];
+    // 只有当字段有值时才保存，避免覆盖已有值
+    const currentValues = getFieldValues();
+    const hasValue = Object.values(currentValues).some(v => v && v !== '');
+    if (hasValue) {
+      currentSp.fieldValues = currentValues;
+      // 同时保存高亮来源信息
+      currentSp.fieldSources = {...FIELD_SOURCES};
+      console.log('保存字段值和sources到物种:', currentSp.name, Object.keys(currentValues).filter(k => currentValues[k]).length, '个字段有值,', Object.keys(FIELD_SOURCES).length, '个sources');
+    }
+    // 离开时，如果当前是active且不是done，改成pending
+    if (currentSp.status === 'active') {
+      currentSp.status = 'pending';
+    }
+  }
+
+  currentSpeciesIndex = index;
+  const sp = speciesQueue[index];
+  // 只有pending状态才改成active，done状态保持不变
+  if (sp.status === 'pending') {
+    sp.status = 'active';
+  }
+
+  // 加载到文本框
+  const textInput = document.getElementById('textInput');
+  if (textInput) {
+    textInput.textContent = sp.content;
+    clearHighlights();
+    console.log('loadSpecies: 设置文本框', sp.name, sp.content.length, '字符');
+  } else {
+    console.error('loadSpecies: 找不到textInput元素');
+  }
+
+  // 恢复该物种的字段值和sources（如果有保存）
+  if (sp.fieldValues) {
+    setFieldValues(sp.fieldValues);
+    console.log('恢复字段值从物种:', sp.name, Object.keys(sp.fieldValues).filter(k => sp.fieldValues[k]).length, '个字段有值');
+  } else {
+    // 没有保存的字段值，清空字段
+    clearFields();
+  }
+
+  // 恢复高亮来源信息
+  if (sp.fieldSources) {
+    FIELD_SOURCES = {...sp.fieldSources};
+    console.log('恢复高亮sources从物种:', sp.name, Object.keys(FIELD_SOURCES).length, '个sources');
+  } else {
+    FIELD_SOURCES = {};
+  }
+
+  // 如果taxon为空，尝试从文件名或内容第一行提取
+  const taxonInput = document.getElementById('taxonInput');
+  if (!taxonInput.value || taxonInput.value === '') {
+    const firstLine = sp.content.split('\n')[0].trim();
+    if (firstLine && firstLine.length < 100) {
+      taxonInput.value = firstLine;
+    } else {
+      taxonInput.value = sp.name;
+    }
+  }
+
+  // 更新字符计数
+  updateCharCount();
+  // 渲染列表
+  renderBatchList();
+  // 更新当前物种名显示
+  document.getElementById('batchCurrentName').textContent = sp.name;
+
+  showStatus(`已加载第 ${index + 1}/${speciesQueue.length} 个：${sp.name}${sp.fieldValues ? '（已恢复字段值）' : ''}`, 'info');
+}
+
+function nextSpecies() {
+  if (currentSpeciesIndex < speciesQueue.length - 1) {
+    loadSpecies(currentSpeciesIndex + 1);
+  } else {
+    showStatus('已经是最后一个物种了', 'info');
+  }
+}
+
+function prevSpecies() {
+  if (currentSpeciesIndex > 0) {
+    loadSpecies(currentSpeciesIndex - 1);
+  } else {
+    showStatus('已经是第一个物种了', 'info');
+  }
+}
+
+function clearBatchQueue() {
+  if (!confirm('确定清空批量处理队列吗？已提取的记录不会被删除。')) return;
+  speciesQueue = [];
+  currentSpeciesIndex = -1;
+  document.getElementById('batchSection').style.display = 'none';
+  document.getElementById('batchCurrentName').textContent = '未选择';
+  showStatus('批量处理队列已清空', 'info');
+}
+
+// 标记当前物种为已完成，并自动加载下一个
+function markCurrentDoneAndNext() {
+  if (currentSpeciesIndex >= 0 && currentSpeciesIndex < speciesQueue.length) {
+    // 先保存字段值
+    const currentValues = getFieldValues();
+    speciesQueue[currentSpeciesIndex].fieldValues = currentValues;
+    speciesQueue[currentSpeciesIndex].status = 'done';
+  }
+  renderBatchList();
+
+  // 自动加载下一个（loadSpecies会自动保存当前并恢复/清空字段）
+  if (currentSpeciesIndex < speciesQueue.length - 1) {
+    setTimeout(() => {
+      loadSpecies(currentSpeciesIndex + 1);
+    }, 500);
+  } else {
+    showStatus('🎉 所有物种处理完成！', 'success');
+  }
+}
+
+// ==================== 自动批量提取 ====================
+function toggleAutoExtract() {
+  if (autoExtractRunning) {
+    // 停止
+    autoExtractRunning = false;
+    document.getElementById('autoExtractBtn').textContent = '▶️ 开始自动提取';
+    document.getElementById('autoExtractBtn').className = 'btn btn-primary btn-sm';
+    updateAutoExtractStatus('已停止');
+    showStatus('自动提取已停止', 'info');
+    return;
+  }
+
+  // 开始
+  if (speciesQueue.length === 0) {
+    showStatus('请先批量导入TXT文件', 'error');
+    return;
+  }
+
+  // 从当前位置或第一个开始
+  if (currentSpeciesIndex < 0) {
+    currentSpeciesIndex = 0;
+  }
+
+  autoExtractRunning = true;
+  autoExtractStats = { success: 0, failed: 0, skipped: 0 };
+  document.getElementById('autoExtractBtn').textContent = '⏹️ 停止';
+  document.getElementById('autoExtractBtn').className = 'btn btn-danger btn-sm';
+
+  // 加载当前物种并开始提取
+  loadSpecies(currentSpeciesIndex);
+  setTimeout(() => {
+    updateAutoExtractStatus(`正在处理 ${speciesQueue[currentSpeciesIndex].name}...`);
+    extractTraits();
+  }, 500);
+}
+
+function updateAutoExtractStatus(msg) {
+  const el = document.getElementById('autoExtractStatus');
+  if (el) {
+    const stats = `成功:${autoExtractStats.success} 失败:${autoExtractStats.failed} 跳过:${autoExtractStats.skipped}`;
+    el.textContent = `${msg} | ${stats}`;
+  }
+}
+
+// 提取完成后（无映射需要标准化）的自动处理
+function autoExtractAfterExtract() {
+  if (!autoExtractRunning) return;
+  console.log('autoExtractAfterExtract: 提取完成，准备添加记录');
+  addRecordForAutoExtract();
+}
+
+// 映射应用后的自动处理
+function autoExtractAfterMapping() {
+  if (!autoExtractRunning) return;
+  console.log('autoExtractAfterMapping: 映射已应用，准备添加记录');
+  addRecordForAutoExtract();
+}
+
+// 自动模式下添加记录
+function addRecordForAutoExtract() {
+  if (!autoExtractRunning) return;
+
+  const values = getFieldValues();
+  const filledCount = Object.keys(values).filter(k => k !== 'taxon' && values[k] && values[k] !== '').length;
+
+  if (!values.taxon && filledCount === 0) {
+    autoExtractStats.skipped++;
+    updateAutoExtractStatus(`跳过 ${speciesQueue[currentSpeciesIndex]?.name || '未知'}（无数据）`);
+  } else {
+    // 添加到记录
+    records.push(values);
+    renderRecordsTable();
+    autoExtractStats.success++;
+    updateAutoExtractStatus(`已添加 ${values.taxon || speciesQueue[currentSpeciesIndex]?.name}`);
+  }
+
+  // 标记当前完成并继续下一个
+  autoExtractNext();
+}
+
+// 自动提取下一个
+function autoExtractNext() {
+  if (!autoExtractRunning) return;
+
+  // 标记当前完成
+  if (currentSpeciesIndex >= 0 && currentSpeciesIndex < speciesQueue.length) {
+    speciesQueue[currentSpeciesIndex].fieldValues = getFieldValues();
+    speciesQueue[currentSpeciesIndex].status = 'done';
+  }
+  renderBatchList();
+
+  // 检查是否还有下一个
+  if (currentSpeciesIndex >= speciesQueue.length - 1) {
+    finishAutoExtract();
+    return;
+  }
+
+  // 加载下一个
+  currentSpeciesIndex++;
+  setTimeout(() => {
+    loadSpecies(currentSpeciesIndex);
+    setTimeout(() => {
+      if (autoExtractRunning) {
+        updateAutoExtractStatus(`正在处理 ${speciesQueue[currentSpeciesIndex].name}...`);
+        extractTraits();
+      }
+    }, 500);
+  }, 300);
+}
+
+// 自动提取完成
+function finishAutoExtract() {
+  autoExtractRunning = false;
+  document.getElementById('autoExtractBtn').textContent = '▶️ 开始自动提取';
+  document.getElementById('autoExtractBtn').className = 'btn btn-primary btn-sm';
+  const msg = `🎉 自动提取完成！成功:${autoExtractStats.success} 失败:${autoExtractStats.failed} 跳过:${autoExtractStats.skipped}`;
+  updateAutoExtractStatus(msg);
+  showStatus(msg, 'success');
+}
+
+// 更新字符计数
+function updateCharCount() {
+  const text = document.getElementById('textInput').textContent || '';
+  const el = document.getElementById('charCount');
+  if (el) el.textContent = text.length + ' 字';
+}
+
+// ==================== 记录管理 ====================
+function addRecord() {
+  const values = getFieldValues();
+  if (!values.taxon) {
+    showStatus('请先填写物种学名 (taxon)', 'error');
+    return;
+  }
+
+  if (editingIndex >= 0) {
+    records[editingIndex] = values;
+    showStatus(`已更新记录: ${values.taxon}`, 'success');
+  } else {
+    records.push(values);
+    showStatus(`已添加记录: ${values.taxon}（共${records.length}条），字段保留可继续修改`, 'success');
+  }
+
+  // 无论是否批量模式，都刷新记录列表
+  renderRecordsTable();
+
+  // 批量处理模式：标记当前物种为已完成，并自动加载下一个（loadSpecies会自动清空字段）
+  if (speciesQueue.length > 0 && currentSpeciesIndex >= 0 && editingIndex < 0) {
+    markCurrentDoneAndNext();
+  }
+  // 非批量模式：不清空字段，用户可手动点击"清空字段"或继续修改
+}
+
+function editRecord(index) {
+  setFieldValues(records[index]);
+  editingIndex = index;
+  showStatus(`正在编辑: ${records[index].taxon}`, 'info');
+  window.scrollTo(0, 0);
+}
+
+function deleteRecord(index) {
+  const taxon = records[index].taxon;
+  if (!confirm(`确定删除记录 "${taxon}" 吗？`)) return;
+  records.splice(index, 1);
+  if (editingIndex === index) editingIndex = -1;
+  renderRecordsTable();
+  showStatus(`已删除: ${taxon}`, 'info');
+}
+
+function clearAllRecords() {
+  if (records.length === 0) return;
+  if (!confirm(`确定清空全部 ${records.length} 条记录吗？此操作不可恢复。`)) return;
+  records = [];
+  editingIndex = -1;
+  renderRecordsTable();
+  showStatus('已清空全部记录', 'info');
+}
+
+function renderRecordsTable() {
+  const head = document.getElementById('recordsHead');
+  const body = document.getElementById('recordsBody');
+  const emptyState = document.getElementById('emptyState');
+  const countEl = document.getElementById('recordsCount');
+
+  countEl.textContent = `共 ${records.length} 条`;
+
+  // 构建预览字段：优先显示有值的字段，尺寸字段显示基础名+平均值
+  const sizeBaseKeys = new Set(FIELD_CONFIG.filter(f => f.isSizeBase).map(f => f.key));
+  const allPreviewFields = [];
+
+  FIELD_CONFIG.forEach(f => {
+    if (f.isTaxon) return;
+    if (f.isSizeBase) {
+      // 尺寸基础字段：显示平均值
+      allPreviewFields.push({
+        key: f.key + '_avg',
+        label: f.label,
+        getValue: r => r[f.key + '_avg'] || ''
+      });
+    } else if (f.sizeBase && sizeBaseKeys.has(f.sizeBase)) {
+      // 有对应基础字段的尺寸子字段：不单独显示
+      return;
+    } else {
+      // 普通字段和独立尺寸子字段
+      allPreviewFields.push({
+        key: f.key,
+        label: f.label,
+        getValue: r => r[f.key] || ''
+      });
+    }
+  });
+
+  // 按有值的记录数排序，优先显示有值的字段
+  allPreviewFields.sort((a, b) => {
+    const countA = records.filter(r => a.getValue(r)).length;
+    const countB = records.filter(r => b.getValue(r)).length;
+    return countB - countA;
+  });
+
+  const previewFields = allPreviewFields.slice(0, 8);
+
+  let headHtml = '<th style="min-width:140px;">物种学名</th>';
+  previewFields.forEach(f => { headHtml += `<th>${escapeHtml(f.label)}</th>`; });
+  headHtml += '<th style="min-width:100px;">操作</th>';
+  head.innerHTML = headHtml;
+
+  if (records.length === 0) {
+    body.innerHTML = '';
+    emptyState.style.display = 'block';
+    return;
+  }
+  emptyState.style.display = 'none';
+
+  body.innerHTML = records.map((r, i) => {
+    let row = `<tr><td><strong>${escapeHtml(r.taxon || '-')}</strong></td>`;
+    previewFields.forEach(f => { row += `<td>${escapeHtml(f.getValue(r) || '-')}</td>`; });
+    row += `<td class="row-actions">
+      <button class="btn btn-light btn-sm" onclick="editRecord(${i})">编辑</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteRecord(${i})">删除</button>
+    </td></tr>`;
+    return row;
+  }).join('');
+}
+
+// ==================== 导出 Excel ====================
+function exportExcel() {
+  if (records.length === 0) {
+    showStatus('没有可导出的记录', 'error');
+    return;
+  }
+
+  // 找出所有尺寸基础字段
+  const sizeBaseKeys = new Set(FIELD_CONFIG.filter(f => f.isSizeBase).map(f => f.key));
+
+  // 构建导出列定义
+  // 每列: { colName, getValue(record) }
+  const exportColumns = [];
+
+  FIELD_CONFIG.forEach(f => {
+    // taxon字段
+    if (f.isTaxon) {
+      exportColumns.push({
+        colName: f.originalName || f.label,
+        getValue: r => r.taxon || ''
+      });
+      return;
+    }
+
+    // 尺寸基础字段：导出平均值，列名用原始CSV表头名
+    if (f.isSizeBase) {
+      exportColumns.push({
+        colName: f.originalName || f.label,
+        getValue: r => r[f.key + '_avg'] || ''
+      });
+      return;
+    }
+
+    // 有对应基础字段的尺寸子字段：不导出
+    if (f.sizeBase && sizeBaseKeys.has(f.sizeBase)) return;
+
+    // 普通字段和独立尺寸子字段：正常导出
+    exportColumns.push({
+      colName: f.originalName || f.label,
+      getValue: r => r[f.key] || '',
+      type: f.type
+    });
+  });
+
+  // 过滤掉所有记录都为空的列
+  const nonEmptyColumns = exportColumns.filter(col =>
+    records.some(r => {
+      const v = col.getValue(r);
+      return v !== '' && v !== null && v !== undefined;
+    })
+  );
+
+  // 构建数据
+  const data = records.map(r => {
+    const row = {};
+    nonEmptyColumns.forEach(col => {
+      let val = col.getValue(r);
+      if (col.type === 'list') {
+        // 列表类型：导出为逗号分隔的纯文本，空值导出为空
+        if (val === '' || val === null || val === undefined) {
+          row[col.colName] = '';
+        } else {
+          // 兼容数组格式和字符串格式
+          if (Array.isArray(val)) {
+            row[col.colName] = val.join(', ');
+          } else {
+            const items = String(val).split(/[,，、;；]/).map(s => s.trim()).filter(s => s);
+            row[col.colName] = items.join(', ');
+          }
+        }
+      } else if (col.type === 'number') {
+        row[col.colName] = val === '' ? '' : (isNaN(parseFloat(val)) ? val : parseFloat(val));
+      } else {
+        row[col.colName] = val;
+      }
+    });
+    return row;
+  });
+
+  const header = nonEmptyColumns.map(c => c.colName);
+  console.log('导出列:', header);
+  console.log('XLSX可用:', typeof XLSX !== 'undefined');
+  try {
+    const ws = XLSX.utils.json_to_sheet(data, { header });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '植物性状');
+
+    const now = new Date();
+    const filename = `植物性状_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xlsx`;
+
+    XLSX.writeFile(wb, filename);
+    showStatus(`✅ 已导出 ${records.length} 条记录、${nonEmptyColumns.length} 列到 ${filename}`, 'success');
+  } catch(err) {
+    console.error('导出错误:', err);
+    showStatus(`❌ 导出失败: ${err.message}`, 'error');
+  }
+}
+
+// ==================== API 设置 ====================
+function openSettings() {
+  const s = getSettings();
+  document.getElementById('apiBase').value = s.apiBase || '';
+  document.getElementById('apiKey').value = s.apiKey || '';
+  document.getElementById('apiModel').value = s.apiModel || '';
+  document.getElementById('settingsModal').classList.add('active');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('active');
+}
+
+function saveSettings() {
+  const settings = {
+    apiBase: document.getElementById('apiBase').value.trim() || 'https://ark.cn-beijing.volces.com/api/v3',
+    apiKey: document.getElementById('apiKey').value.trim(),
+    apiModel: document.getElementById('apiModel').value.trim()
+  };
+  localStorage.setItem('plantTraitInitSettings', JSON.stringify(settings));
+  closeSettings();
+  showStatus('设置已保存', 'success');
+}
+
+function getSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('plantTraitInitSettings') || '{}');
+    return {
+      apiBase: s.apiBase || 'https://ark.cn-beijing.volces.com/api/v3',
+      apiKey: s.apiKey || '',
+      apiModel: s.apiModel || ''
+    };
+  } catch {
+    return { apiBase: 'https://ark.cn-beijing.volces.com/api/v3', apiKey: '', apiModel: '' };
+  }
+}
+
+// 重置所有数据（恢复初始状态）
+// ==================== 备份与恢复 ====================
+function exportBackup() {
+  const backup = {
+    version: '1.0',
+    exportTime: new Date().toISOString(),
+    fields: localStorage.getItem('plantTraitInitFields'),
+    settings: localStorage.getItem('plantTraitInitSettings'),
+    mappingCache: localStorage.getItem('plantTraitInitMappingCache'),
+    records: JSON.stringify(records),
+    speciesQueue: JSON.stringify(speciesQueue.map(s => ({...s, fieldValues: s.fieldValues || {}})))
+  };
+  const jsonStr = JSON.stringify(backup, null, 2);
+  // 加BOM确保编码正确
+  const blob = new Blob(['\ufeff' + jsonStr], {type: 'application/json;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const now = new Date();
+  a.download = `植物性状工具备份_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showStatus('✅ 备份文件已导出，包含字段配置、映射缓存、API设置和记录', 'success');
+}
+
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const text = e.target.result;
+      console.log('备份文件内容前200字:', text.substring(0, 200));
+      const backup = JSON.parse(text);
+
+      if (!confirm('确定要从备份恢复数据吗？\n\n将覆盖当前的：\n• API设置\n• 性状字段配置\n• AI归类缓存\n• 所有记录和物种队列\n\n当前数据将被替换！')) return;
+
+      if (backup.fields) localStorage.setItem('plantTraitInitFields', backup.fields);
+      if (backup.settings) localStorage.setItem('plantTraitInitSettings', backup.settings);
+      if (backup.mappingCache) localStorage.setItem('plantTraitInitMappingCache', backup.mappingCache);
+
+      // 重新加载设置和字段
+      const settings = JSON.parse(localStorage.getItem('plantTraitInitSettings') || '{}');
+      document.getElementById('apiBase').value = settings.apiBase || '';
+      document.getElementById('apiKey').value = settings.apiKey || '';
+      document.getElementById('apiModel').value = settings.apiModel || '';
+
+      // 重新加载字段配置
+      const saved = localStorage.getItem('plantTraitInitFields');
+      if (saved) {
+        FIELD_CONFIG = JSON.parse(saved);
+        FIELD_CONFIG.forEach(f => {
+          if (f.isTaxon === undefined) f.isTaxon = isTaxonField(f.label || f.originalName || f.key);
+          if (f.desc === undefined) f.desc = '';
+          if (f.standardExamples === undefined) f.standardExamples = [];
+          if (f.isSizeBase === undefined) f.isSizeBase = false;
+          if (f.sizeBase === undefined) f.sizeBase = null;
+        });
+      }
+      const savedCache = localStorage.getItem('plantTraitInitMappingCache');
+      if (savedCache) MAPPING_CACHE = JSON.parse(savedCache);
+
+      // 恢复记录和队列
+      if (backup.records) records = JSON.parse(backup.records);
+      if (backup.speciesQueue) {
+        speciesQueue = JSON.parse(backup.speciesQueue);
+        currentSpeciesIndex = -1;
+        if (speciesQueue.length > 0) {
+          document.getElementById('batchSection').style.display = 'block';
+          renderBatchList();
+        }
+      }
+
+      renderFieldGroups();
+      renderRecordsTable();
+      updateFieldFillCount();
+      updateCharCount();
+
+      showStatus(`✅ 数据已从备份恢复（导出时间: ${backup.exportTime ? new Date(backup.exportTime).toLocaleString() : '未知'}）`, 'success');
+    } catch (err) {
+      showStatus('恢复失败：' + err.message, 'error');
+      console.error('备份恢复错误详情:', err);
+      console.error('文件内容:', e.target.result?.substring(0, 500));
+    }
+  };
+  reader.onerror = function() {
+    showStatus('读取文件失败', 'error');
+  };
+  reader.readAsText(file, 'utf-8');
+  event.target.value = '';
+}
+
+// ==================== 重置所有数据 ====================
+function resetAllData() {
+  if (!confirm('确定要重置所有数据吗？\n\n将清空：\n• API设置\n• 性状字段配置\n• AI归类缓存\n• 所有记录\n\n此操作不可恢复！')) return;
+
+  // 清空所有本版本的存储
+  localStorage.removeItem('plantTraitInitFields');
+  localStorage.removeItem('plantTraitInitSettings');
+  localStorage.removeItem('plantTraitInitMappingCache');
+
+  // 清空内存中的数据
+  FIELD_CONFIG = [];
+  MAPPING_CACHE = {};
+  records = [];
+  speciesQueue = [];
+  currentSpeciesIndex = -1;
+  PENDING_MAPPINGS = [];
+  editingIndex = -1;
+
+  // 清空界面
+  document.getElementById('textInput').textContent = '';
+  document.getElementById('taxonInput').value = '';
+  clearHighlights();
+  renderFieldGroups();
+  renderRecordsTable();
+  updateFieldFillCount();
+  updateCharCount();
+
+  // 隐藏批量处理区域
+  const batchSection = document.getElementById('batchSection');
+  if (batchSection) batchSection.style.display = 'none';
+
+  closeSettings();
+  showStatus('✅ 已重置所有数据，恢复初始状态', 'success');
+}
+
+document.getElementById('settingsModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
+});
+document.getElementById('fieldConfigModal').addEventListener('click', function(e) {
+  if (e.target === this) closeFieldConfig();
+});
+document.getElementById('mappingModal').addEventListener('click', function(e) {
+  if (e.target === this) skipMapping();
+});
+
+// ==================== 初始化 ====================
+document.addEventListener('DOMContentLoaded', () => {
+  loadFieldConfigFromStorage();
+  renderFieldGroups();  // 无论有没有配置都渲染，为空时显示导入提示
+  renderRecordsTable();
+  updateFieldFillCount();
+  updateCharCount();
+
+  // 绑定映射管理模态框点击事件（元素在script之后定义，所以要在这里绑定）
+  document.getElementById('mappingManagerModal').addEventListener('click', function(e) {
+    if (e.target === this) closeMappingManager();
+  });
+
+  // 首次使用提示
+  const settings = getSettings();
+  if (FIELD_CONFIG.length === 0 || !settings.apiKey) {
+    setTimeout(() => {
+      showStatus('👋 欢迎使用！请先：1️⃣ 导入性状CSV 2️⃣ 在设置中配置API Key', 'info');
+    }, 500);
+  }
+});
+</script>
+
+<!-- 映射管理模态框 -->
+<div class="modal-overlay" id="mappingManagerModal">
+  <div class="modal" style="width:860px;">
+    <h3>🔗 映射管理</h3>
+    <p style="font-size:12px;color:#666;margin-bottom:12px;line-height:1.6;">
+      查看和管理所有已缓存的AI归类映射。修改后立即生效，下次提取新物种时使用新映射。已提取的记录不会自动改变。
+    </p>
+    <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;">
+      <select id="mappingManagerFilter" onchange="renderMappingManager()" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;min-width:180px;">
+        <option value="">全部字段</option>
+      </select>
+      <input type="text" id="mappingManagerSearch" placeholder="搜索原始词或标准词..." oninput="renderMappingManager()" style="flex:1;padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+      <button class="btn btn-light btn-sm" onclick="document.getElementById('mappingManagerImportFile').click()">📥 导入映射CSV</button>
+      <button class="btn btn-light btn-sm" onclick="exportAllMappings()">📤 导出全部</button>
+      <input type="file" id="mappingManagerImportFile" accept=".csv,.txt" style="display:none" onchange="handleMappingManagerImport(event)">
+    </div>
+    <div id="mappingManagerContent" style="max-height:55vh;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <span id="mappingManagerStats" style="font-size:12px;color:#888;"></span>
+      <button class="btn btn-light" onclick="closeMappingManager()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 隐藏模板：字段为空时的欢迎提示 -->
+<div style="display:none;">
+  <div class="welcome-box" id="welcomeBox">
+    <div class="icon">📋</div>
+    <h3>请先导入CSV定义性状字段</h3>
+    <p>性状字段完全由你的CSV文件决定，不预设任何固定性状。</p>
+    <ol class="steps">
+      <li><strong>第一步</strong>：点击顶部「📥 导入CSV」，选择你的CSV文件</li>
+      <li><strong>第二步</strong>：CSV第一行即性状名称（支持中文），第一列建议为 taxon 或 物种学名</li>
+      <li><strong>第三步</strong>：导入后可在「⚙️ 字段配置」中调整类型并添加AI提取说明</li>
+      <li><strong>第四步</strong>：抓取网页或粘贴文本，AI提取或划词填入</li>
+    </ol>
+    <p style="margin-top:12px;font-size:12px;color:#aaa;">CSV示例：<code>taxon,叶形,花色,果形,叶长cm,叶宽cm</code></p>
+  </div>
+</div>
+
+</body>
+</html>
